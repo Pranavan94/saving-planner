@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:18.3-alpine3.23
+    container_name: saving-planner-postgres
+    environment:
+      POSTGRES_DB: ${PSQL_DB_NAME}
+      POSTGRES_USER: ${PSQL_DB_USER}
+      POSTGRES_PASSWORD: ${PSQL_DB_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d saving_planner"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: saving-planner-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DB_HOST: ${PSQL_DB_HOST_NAME}
+      DB_PORT: ${PSQL_DB_PORT}
+      DB_NAME: ${PSQL_DB_NAME}
+      DB_USERNAME: ${PSQL_DB_USER}
+      DB_PASSWORD: ${PSQL_DB_PASSWORD}
+      JAVA_OPTS: -Xms256m -Xmx512m
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+
