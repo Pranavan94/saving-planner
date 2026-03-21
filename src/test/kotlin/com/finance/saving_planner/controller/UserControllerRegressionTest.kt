@@ -129,16 +129,16 @@ class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
     }
 
     @Test
-    @DisplayName("RT-006: PUT /update successfully updates user data")
+    @DisplayName("RT-006: PUT /{userId} successfully updates user data")
     fun testUpdateUserSuccess() {
         val updatePayload = objectMapper.createObjectNode().apply {
-            put("id", testUserId.toString())
             put("email", "updated@example.com")
             put("firstName", "Updated")
+            put("phoneNumber", "+1 1112223333")
         }
 
         mockMvc.perform(
-            put("$basePath/update")
+            put("$basePath/{userId}", testUserId.toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePayload))
         )

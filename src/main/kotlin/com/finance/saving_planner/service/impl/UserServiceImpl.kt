@@ -8,8 +8,6 @@ import com.finance.saving_planner.repository.UserRepository
 import com.finance.saving_planner.service.UserService
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.security.crypto.password.PasswordEncoder
-import org.springframework.security.core.context.SecurityContextHolder
-import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import java.util.UUID
@@ -64,9 +62,7 @@ class UserServiceImpl(
         return userRepository.findAll()
     }
 
-    override fun updateUser(user: JsonNode): String {
-        val userId = resolveUserId(user)
-
+    override fun updateUser(userId: UUID, user: JsonNode): String {
         // Update the user in the database
         val existingUser = userRepository.findById(userId)
             .orElseThrow { IllegalArgumentException("User with ID $userId not found") }
@@ -76,7 +72,7 @@ class UserServiceImpl(
             firstName = user["firstName"]?.asText() ?: existingUser.firstName,
             middleName = user["middleName"]?.asText() ?: existingUser.middleName,
             lastName = user["lastName"]?.asText() ?: existingUser.lastName,
-            telephoneNumber = user["telephoneNumber"]?.asLong() ?: existingUser.telephoneNumber,
+            telephoneNumber = extractTelephoneNumber(user) ?: existingUser.telephoneNumber,
             onboardingDone = true,
             updatedAt = LocalDateTime.now(), // Always update the timestamp
         )
@@ -84,25 +80,15 @@ class UserServiceImpl(
         return "User ${updatedUser.firstName} ${updatedUser.lastName}  updated successfully"
     }
 
-    private fun resolveUserId(user: JsonNode): UUID {
-        val requestUserId = user["id"]?.asText()?.takeIf { it.isNotBlank() }
-        if (requestUserId != null) {
-            return UUID.fromString(requestUserId)
+    private fun extractTelephoneNumber(user: JsonNode): Long? {
+        val phoneNode = user["telephoneNumber"] ?: user["phoneNumber"] ?: return null
+
+        return when {
+            phoneNode.isNumber -> phoneNode.asLong()
+            phoneNode.isTextual -> normalizeTelephoneNumber(phoneNode.asText())
+            phoneNode.isNull -> null
+            else -> throw IllegalArgumentException("Invalid telephone number format")
         }
-
-        val authentication = SecurityContextHolder.getContext().authentication
-            ?: throw IllegalArgumentException("User authentication not found")
-
-        val principal = authentication.principal
-        val identifier = when (principal) {
-            is Jwt -> principal.claims["sub"]?.toString()
-            else -> authentication.name
-        }?.removePrefix("auth0|")
-
-        return identifier
-            ?.takeIf { it.isNotBlank() }
-            ?.let(UUID::fromString)
-            ?: throw IllegalArgumentException("User ID not found in authentication context")
     }
 
     override fun getAllUserInfoById(userId: UUID): AllUserInfoDTO {

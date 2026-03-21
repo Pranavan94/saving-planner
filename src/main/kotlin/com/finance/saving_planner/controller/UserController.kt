@@ -84,9 +84,9 @@ class UserController(private val userService: UserService) {
         return userService.getAllUsers()
     }
 
-    @PutMapping("/update")
-    fun updateUser(@RequestBody body: JsonNode): String {
-        val result = userService.updateUser(body)
+    @PutMapping(PATH_FIND)
+    fun updateUser(@PathVariable userId: UUID, @RequestBody body: JsonNode): String {
+        val result = userService.updateUser(userId, body)
         println("====>>> updateUser() $result")
         return result
     }

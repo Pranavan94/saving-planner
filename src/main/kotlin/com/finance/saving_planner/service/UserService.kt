@@ -14,7 +14,7 @@ interface UserService {
 
     fun getAllUsers(): Collection<User>
 
-    fun updateUser(user: JsonNode): String
+    fun updateUser(userId: UUID, user: JsonNode): String
 
     fun deleteUser(userId: UUID): String
 

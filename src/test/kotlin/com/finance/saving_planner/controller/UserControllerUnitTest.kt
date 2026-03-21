@@ -163,19 +163,18 @@ class UserControllerTest {
     fun testUpdateUserSuccess() {
         // Arrange
         val updateJson: JsonNode = objectMapper.createObjectNode().apply {
-            put("id", testUserId.toString())
             put("email", "newemail@example.com")
             put("firstName", "Jane")
         }
         val expectedMessage = "User updated successfully"
-        whenever(userService.updateUser(any())).thenReturn(expectedMessage)
+        whenever(userService.updateUser(testUserId, updateJson)).thenReturn(expectedMessage)
 
         // Act
-        val result = userController.updateUser(updateJson)
+        val result = userController.updateUser(testUserId, updateJson)
 
         // Assert
         assertEquals(expectedMessage, result)
-        verify(userService).updateUser(any())
+        verify(userService).updateUser(testUserId, updateJson)
     }
 
     @Test
@@ -184,15 +183,14 @@ class UserControllerTest {
         // Arrange
         val nonExistentId = UUID.randomUUID()
         val updateJson: JsonNode = objectMapper.createObjectNode().apply {
-            put("id", nonExistentId.toString())
             put("email", "newemail@example.com")
         }
-        whenever(userService.updateUser(any()))
+        whenever(userService.updateUser(nonExistentId, updateJson))
             .thenThrow(IllegalArgumentException("User not found"))
 
         // Act & Assert
         assertThrows<IllegalArgumentException> {
-            userController.updateUser(updateJson)
+            userController.updateUser(nonExistentId, updateJson)
         }
     }
 
