@@ -11,8 +11,10 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.persistence.EntityNotFoundException
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -89,8 +91,14 @@ class UserController(private val userService: UserService) {
         return result
     }
 
-    @DeleteMapping("/remove/{userid}")
-    fun removeUser(@PathVariable userid: UUID): String {
-        return userService.deleteUser(userid)
+    @DeleteMapping(PATH_FIND)
+    fun removeUser(@PathVariable userId: UUID): ResponseEntity<String> {
+        try {
+            val result = userService.deleteUser(userId)
+            println("====>>> removeUser() $result")
+            return ResponseEntity.ok(result)
+        } catch (e: EntityNotFoundException) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.message ?: "User not found")
+        }
     }
 }

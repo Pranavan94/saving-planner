@@ -6,10 +6,12 @@ import com.finance.saving_planner.dto.CreateUserRequest
 import com.finance.saving_planner.dto.MessageResponse
 import com.finance.saving_planner.model.User
 import com.finance.saving_planner.service.UserService
+import jakarta.persistence.EntityNotFoundException
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
@@ -205,22 +207,26 @@ class UserControllerTest {
         val result = userController.removeUser(testUserId)
 
         // Assert
-        assertEquals(expectedMessage, result)
+        assertEquals(HttpStatus.OK, result.statusCode)
+        assertEquals(expectedMessage, result.body)
         verify(userService).deleteUser(testUserId)
     }
 
     @Test
-    @DisplayName("Should throw exception when deleting non-existent user")
+    @DisplayName("Should return 404 response when deleting non-existent user")
     fun testRemoveUserNotFound() {
         // Arrange
         val nonExistentId = UUID.randomUUID()
         whenever(userService.deleteUser(nonExistentId))
-            .thenThrow(IllegalArgumentException("User not found"))
+            .thenThrow(EntityNotFoundException("User not found"))
 
-        // Act & Assert
-        assertThrows<IllegalArgumentException> {
-            userController.removeUser(nonExistentId)
-        }
+        // Act
+        val result = userController.removeUser(nonExistentId)
+
+        // Assert
+        assertEquals(HttpStatus.NOT_FOUND, result.statusCode)
+        assertEquals("User not found", result.body)
+        verify(userService).deleteUser(nonExistentId)
     }
 }
 

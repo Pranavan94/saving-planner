@@ -116,7 +116,7 @@ class UserServiceImpl(
             userRepository.deleteById(userId)
             return "User with ID $userId deleted successfully"
         } else {
-            throw IllegalArgumentException("User with ID $userId not found")
+            throw EntityNotFoundException("User with ID $userId not found")
         }
     }
 }

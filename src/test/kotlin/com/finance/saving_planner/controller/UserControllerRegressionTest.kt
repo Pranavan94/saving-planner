@@ -146,10 +146,10 @@ class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
     }
 
     @Test
-    @DisplayName("RT-007: DELETE /remove/{userid} successfully removes user")
+    @DisplayName("RT-007: DELETE /{userId} successfully removes user")
     fun testDeleteUserSuccess() {
         mockMvc.perform(
-            delete("$basePath/remove/{userid}", testUserId.toString())
+            delete("$basePath/{userId}", testUserId.toString())
         )
             .andExpect(status().isOk)
     }
@@ -197,11 +197,22 @@ class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
         assertTrue(userRepository.existsById(testUserId))
 
         mockMvc.perform(
-            delete("$basePath/remove/{userid}", testUserId.toString())
+            delete("$basePath/{userId}", testUserId.toString())
         )
             .andExpect(status().isOk)
 
         assertFalse(userRepository.existsById(testUserId))
+    }
+
+    @Test
+    @DisplayName("RT-010A: DELETE /{userId} returns 404 for missing user")
+    fun testDeleteUserNotFoundReturns404() {
+        val missingUserId = UUID.randomUUID()
+
+        mockMvc.perform(
+            delete("$basePath/{userId}", missingUserId.toString())
+        )
+            .andExpect(status().isNotFound)
     }
 
     @Test
