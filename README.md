@@ -1,124 +1,173 @@
 # Saving Planner
 
-A Spring Boot + Kotlin API for savings planning and budgeting.
+Spring Boot + Kotlin API for user registration and personal finance planning.
 
-## Docker local development
+## Current project setup
 
-This project now includes a complete Docker-based local development setup for:
+This README reflects the current codebase configuration:
 
-- the Spring Boot application
-- a PostgreSQL database
+- Kotlin `2.2.21`
+- Spring Boot `3.3.5`
+- Java toolchain `21`
+- PostgreSQL as the runtime database
+- Spring Security with **HTTP Basic authentication**
+- Docker support for running the app together with PostgreSQL
+- Testcontainers-based PostgreSQL integration tests
 
-Files added for Docker:
+## Runtime defaults verified from the project
+
+### Application ports
+
+- **Local app run:** `http://localhost:8080`
+- **Docker app run:** `http://localhost:8081`
+
+### Database ports
+
+- **Local PostgreSQL expected by default:** `localhost:5433`
+- **Docker PostgreSQL exposed to host:** `localhost:5434`
+
+### Default HTTP Basic credentials
+
+The current `SecurityConfig` defines one in-memory user:
+
+- username: `<username>`
+- password: `<password>`
+
+> This is the credential for calling the secured API right now. Because credentials are explicitly configured in `SecurityConfig`, Spring Boot will **not** print an auto-generated password in the logs.
+
+### Default CORS setup
+
+Browser requests are currently allowed from:
+
+- `http://localhost:3000`
+
+## Database configuration
+
+The application is configured to use PostgreSQL:
+
+- JDBC URL: `jdbc:postgresql://${DB_HOST:<hostname>}:${DB_PORT:<port>}/${DB_NAME:<dbname>}`
+- username: `${DB_USERNAME:<username>}`
+- password: `${DB_PASSWORD:<password>}`
+
+Hibernate SQL logs are **off by default** in `application.properties`.
+
+If you want extra SQL logging during development, use the local profile:
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+```
+
+## Run locally without Docker
+
+Make sure PostgreSQL is running locally and accessible on port `5433`, or provide your own values with environment variables.
+
+### Option 1: use the defaults
+
+This works if your local database matches:
+
+- host: `<hostname>`
+- port: `<port>`
+- database: `<dbname>`
+- username: `<username>`
+- password: `<password>`
+
+Then run:
+
+```powershell
+.\gradlew.bat bootRun
+```
+
+### Option 2: override database settings for the current terminal session
+
+```powershell
+$env:DB_HOST="<dbhost>"
+$env:DB_PORT="<dbport>"
+$env:DB_NAME="<dbname>"
+$env:DB_USERNAME="<dbuser>"
+$env:DB_PASSWORD="<dbpassword>"
+.\gradlew.bat bootRun
+```
+
+## Run with Docker Compose
+
+This project includes:
 
 - `Dockerfile`
 - `docker-compose.yml`
 - `.dockerignore`
 
-### What you are learning
+The Compose stack starts:
 
-When you run this stack with Docker, you are learning four useful ideas:
+- the Spring Boot app in one container
+- PostgreSQL in another container
 
-1. **Image** – a packaged build of your app
-2. **Container** – a running instance of that image
-3. **Compose** – a way to run multiple services together
-4. **Service networking** – containers can talk to each other by service name
-
-In this project:
-
-- the app runs in one container
-- PostgreSQL runs in another container
-- the app connects to the database using `DB_HOST={hostname of the PostgreSQL container}`
-
-That works because name is the Compose service name.
-
-## Start the full stack
-
-From the project root:
+### Start the full stack
 
 ```powershell
-from you project root
 docker compose up --build
 ```
 
-What this does:
-
-- builds the Spring Boot Docker image from the `Dockerfile`
-- starts PostgreSQL
-- waits for PostgreSQL health check to pass
-- starts the app container
-
-### URLs and credentials
-
-App:
-
-- `http://localhost:8081` or `http://localhost:8080`
-
-PostgreSQL from your host machine:
-
-- host: `localhost`
-- port: `db_port`
-- database: `db_name`
-- username: `db_username`
-- password: `db_password`
-
-App HTTP Basic login:
-
-- username: `app_username`
-- password: `app_password`
-
-> Note: PostgreSQL is exposed on host port `5434` on purpose, so it does not clash with your existing local PostgreSQL running on `5433`.
-> The Spring Boot app is exposed on host port `8081` so it can run at the same time as a host-based app on `8080`.
-
-## Run in the background
+### Start in the background
 
 ```powershell
 docker compose up --build -d
 ```
 
-## Stop the stack
+### Stop the stack
 
 ```powershell
 docker compose down
 ```
 
-## Stop the stack and remove the database volume
+### Stop the stack and remove database data
 
 ```powershell
 docker compose down -v
 ```
 
-Use `-v` only if you want a fresh PostgreSQL database.
-
-## See logs
-
-All logs:
+### View logs
 
 ```powershell
 docker compose logs -f
 ```
 
-Only app logs:
+App logs only:
 
 ```powershell
 docker compose logs -f app
 ```
 
-Only PostgreSQL logs:
+PostgreSQL logs only:
 
 ```powershell
 docker compose logs -f postgres
 ```
 
-## Test the running app
+## Docker environment variables
 
-Open Postman and use:
+`docker-compose.yml` expects a `.env` file for PostgreSQL and app configuration.
 
-- base URL: `http://localhost:8081` or `http://localhost:8080`
-- Basic Auth username: `app_username`
-- Basic Auth password: `app_password`
+The current Compose file uses these variable names:
 
-Or test quickly from PowerShell:
+- `PSQL_DB_HOST_NAME`
+- `PSQL_DB_PORT`
+- `PSQL_DB_NAME`
+- `PSQL_DB_USER`
+- `PSQL_DB_PASSWORD`
+
+The app container maps them to:
+
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+
+## Test the API
+
+All endpoints currently require Basic Auth.
+
+### PowerShell example
 
 ```powershell
 $pair = 'username:password'
@@ -127,22 +176,26 @@ $token = [Convert]::ToBase64String($bytes)
 Invoke-WebRequest -Uri "http://localhost:8081/api/v1/users" -Headers @{ Authorization = "Basic $token" }
 ```
 
+If the app is running in Docker, use port `8081` instead.
+
 ## Frontend integration notes
 
-The backend allows browser calls from `http://localhost:3000` by default.
+The backend currently supports browser calls from `http://localhost:3000`.
 
-You can override the allowed origin list before starting the backend:
+To allow multiple frontend origins before starting the backend:
 
 ```powershell
 $env:CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
 ```
 
-Example browser `fetch(...)` call using the current Basic Auth setup:
+Because the API currently uses **Basic Auth headers**, frontend requests should send the `Authorization` header. Cookie-based auth is not configured.
+
+Example frontend request:
 
 ```javascript
 const credentials = btoa('username:password');
 
-const response = await fetch('http://localhost:8081/api/v1/users/user', {
+const response = await fetch('<localhost:url>/api/v1/users/user', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -155,115 +208,80 @@ const response = await fetch('http://localhost:8081/api/v1/users/user', {
     lastName: 'User',
     password: 'secret123',
     role: 'USER',
+    telephoneNumber: '+1 1234567890',
     onboardingDone: true
   })
 });
 ```
 
-Because the API currently uses Basic Auth headers rather than cookie-based login, you do not need `credentials: 'include'` for this request style.
+Notes:
 
-## Useful Docker commands to learn
+- `CreateUserRequest` accepts `password`, and also supports alias `passwordHash`
+- `CreateUserRequest` accepts `telephoneNumber`, and also supports alias `phoneNumber`
+- telephone numbers are normalized to digits before persistence
 
-Show running containers:
+## Main endpoints
 
-```powershell
-docker ps
-```
+### User endpoints
 
-Show built images:
+Base path: `/api/v1/users`
 
-```powershell
-docker images
-```
+- `POST /api/v1/users/user`
+- `GET /api/v1/users`
+- `GET /api/v1/users/{userId}`
+- `GET /api/v1/users/allinfo/{userId}`
+- `PUT /api/v1/users/{userId}`
+- `DELETE /api/v1/users/{userId}`
 
-Open a shell inside the app container:
+### Personal finance endpoints
 
-```powershell
-docker exec -it saving-planner-app sh
-```
+Base path: `/api/v1/finance/overview`
 
-Open a shell inside PostgreSQL container:
+- `POST /api/v1/finance/overview/create`
+- `GET /api/v1/finance/overview`
+- `GET /api/v1/finance/overview/{financeId}`
+- `PUT /api/v1/finance/overview/{financeId}`
 
-```powershell
-docker exec -it saving-planner-postgres sh
-```
+## Build and test
 
-Connect to PostgreSQL inside the container:
-
-```powershell
-docker exec -it saving-planner-postgres psql -U postgres -d saving_planner
-```
-
-## Recommended learning path
-
-### Step 1: Run only PostgreSQL in Docker
-
-If you want to learn gradually, start with only the database:
+Build the jar:
 
 ```powershell
-docker compose up -d postgres
+.\gradlew.bat bootJar
 ```
 
-Then run your Spring Boot app from IntelliJ or Gradle using:
-
-```text
-- host: `localhost`
-- port: `db_port`
-- database: `db_name`
-- username: `db_username`
-- password: `db_password`
-```
-
-This teaches you how a host app connects to a containerized database.
-
-### Step 2: Run the whole stack in Docker
-
-Then move to:
+Run all tests:
 
 ```powershell
-docker compose up --build
+.\gradlew.bat test
 ```
 
-This teaches you how app-to-db communication works entirely inside Docker.
+The project includes PostgreSQL integration tests via Testcontainers.
 
-## Common issues
+## Troubleshooting
 
-### Port 8080 already in use
+### No generated Spring Security password in logs
 
-Stop the process using port 8080, or change the app mapping in `docker-compose.yml`:
+This is expected. The app defines its own in-memory user in `SecurityConfig`, so Spring Boot does not generate or print a random password.
 
-```yaml
-ports:
-  - "8082:8080"
-```
+### Application fails with datasource configuration errors
 
-### Port 5434 already in use
+Make sure PostgreSQL is running and these values are correct for your environment:
 
-Change this in `docker-compose.yml`:
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- `DB_USERNAME`
+- `DB_PASSWORD`
 
-```yaml
-ports:
-  - "5435:5432"
-```
+### Docker app cannot connect to PostgreSQL
 
-### App starts before DB is ready
+Inside Docker Compose, the app should connect using the configured container host from `.env`, typically the PostgreSQL service name.
 
-This setup already includes a PostgreSQL health check and waits before starting the app.
+### Browser request blocked by CORS
 
-### Want a fresh DB
+Make sure the frontend origin is included in `CORS_ALLOWED_ORIGINS` or leave the default `http://localhost:3000`.
 
-```powershell
-docker compose down -v
-docker compose up --build
-```
+## Postman note
 
-## Next improvements you can learn later
-
-After you are comfortable with this setup, good next topics are:
-
-- Spring Boot profiles like `application-docker.properties`
-- Flyway or Liquibase migrations
-- Docker volumes and bind mounts
-- live reload / dev-only compose overrides
-- CI pipelines that run tests in containers
-
+There is a `postman/README.md` file with additional Postman notes. If you want to keep Postman import files in the repository, place them in the `postman/` folder and document them there.

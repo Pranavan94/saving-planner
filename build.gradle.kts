@@ -29,6 +29,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-web")
+	implementation("org.owasp.encoder:encoder:1.3.1")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("io.swagger.core.v3:swagger-annotations:2.2.27")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")

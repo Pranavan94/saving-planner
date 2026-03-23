@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException
 import com.fasterxml.jackson.databind.exc.MismatchedInputException
 import jakarta.persistence.EntityNotFoundException
 import jakarta.servlet.http.HttpServletRequest
+import org.owasp.encoder.Encode
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -19,6 +20,23 @@ import java.time.LocalDateTime
 class GlobalExceptionHandler {
     companion object {
         private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
+    }
+
+    private fun sanitize(value: Any?): String = Encode.forHtml(value?.toString().orEmpty())
+
+    private fun errorResponse(
+        status: HttpStatus,
+        message: String,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiError> {
+        return ResponseEntity.status(status).body(
+            ApiError(
+                status = status.value(),
+                error = status.reasonPhrase,
+                message = message,
+                path = sanitize(request.requestURI)
+            )
+        )
     }
 
     data class ApiError(
@@ -37,25 +55,19 @@ class GlobalExceptionHandler {
         logger.warn("Malformed JSON request for {} {}", request.method, request.requestURI, ex)
         val message = when (val rootCause = ex.mostSpecificCause) {
             is InvalidFormatException -> {
-                val field = rootCause.path.joinToString(".") { it.fieldName ?: "[index]" }
-                "Invalid value for field '$field': ${rootCause.value}"
+                val field = rootCause.path.joinToString(".") { sanitize(it.fieldName ?: "[index]") }
+                val invalidValue = sanitize(rootCause.value)
+                "Invalid value for field '$field': $invalidValue"
             }
             is MismatchedInputException -> {
-                val field = rootCause.path.joinToString(".") { it.fieldName ?: "[index]" }
+                val field = rootCause.path.joinToString(".") { sanitize(it.fieldName ?: "[index]") }
                 if (field.isBlank()) "Malformed JSON request body"
                 else "Missing or invalid field: '$field'"
             }
             else -> "Malformed JSON request body"
         }
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-            ApiError(
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = HttpStatus.BAD_REQUEST.reasonPhrase,
-                message = message,
-                path = request.requestURI
-            )
-        )
+        return errorResponse(HttpStatus.BAD_REQUEST, message, request)
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException::class)
@@ -64,17 +76,14 @@ class GlobalExceptionHandler {
         request: HttpServletRequest
     ): ResponseEntity<ApiError> {
         logger.warn("Argument type mismatch for {} {}", request.method, request.requestURI, ex)
-        val paramName = ex.name
-        val requiredType = ex.requiredType?.simpleName ?: "required type"
-        val providedValue = ex.value?.toString() ?: "null"
+        val paramName = sanitize(ex.name)
+        val requiredType = sanitize(ex.requiredType?.simpleName ?: "required type")
+        val providedValue = sanitize(ex.value ?: "null")
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-            ApiError(
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = HttpStatus.BAD_REQUEST.reasonPhrase,
-                message = "Invalid value '$providedValue' for parameter '$paramName'. Expected: $requiredType",
-                path = request.requestURI
-            )
+        return errorResponse(
+            HttpStatus.BAD_REQUEST,
+            "Invalid value '$providedValue' for parameter '$paramName'. Expected: $requiredType",
+            request
         )
     }
 
@@ -86,19 +95,14 @@ class GlobalExceptionHandler {
         logger.warn("Validation failed for {} {}", request.method, request.requestURI, ex)
         val firstError = ex.bindingResult.fieldErrors.firstOrNull()
         val message = if (firstError != null) {
-            "Validation failed for '${firstError.field}': ${firstError.defaultMessage}"
+            val field = sanitize(firstError.field)
+            val errorMessage = sanitize(firstError.defaultMessage ?: "Invalid value")
+            "Validation failed for '$field': $errorMessage"
         } else {
             "Validation failed for request body"
         }
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-            ApiError(
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = HttpStatus.BAD_REQUEST.reasonPhrase,
-                message = message,
-                path = request.requestURI
-            )
-        )
+        return errorResponse(HttpStatus.BAD_REQUEST, message, request)
     }
 
     @ExceptionHandler(MissingServletRequestParameterException::class)
@@ -107,13 +111,11 @@ class GlobalExceptionHandler {
         request: HttpServletRequest
     ): ResponseEntity<ApiError> {
         logger.warn("Missing request parameter for {} {}", request.method, request.requestURI, ex)
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-            ApiError(
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = HttpStatus.BAD_REQUEST.reasonPhrase,
-                message = "Missing required parameter '${ex.parameterName}'",
-                path = request.requestURI
-            )
+        val parameterName = sanitize(ex.parameterName)
+        return errorResponse(
+            HttpStatus.BAD_REQUEST,
+            "Missing required parameter '$parameterName'",
+            request
         )
     }
 
@@ -123,20 +125,14 @@ class GlobalExceptionHandler {
         request: HttpServletRequest
     ): ResponseEntity<ApiError> {
         logger.warn("Illegal argument for {} {}: {}", request.method, request.requestURI, ex.message, ex)
-        val status = if (ex.message?.contains("not found", ignoreCase = true) == true) {
+        val rawMessage = ex.message ?: "Invalid request"
+        val status = if (rawMessage.contains("not found", ignoreCase = true)) {
             HttpStatus.NOT_FOUND
         } else {
             HttpStatus.BAD_REQUEST
         }
 
-        return ResponseEntity.status(status).body(
-            ApiError(
-                status = status.value(),
-                error = status.reasonPhrase,
-                message = ex.message ?: "Invalid request",
-                path = request.requestURI
-            )
-        )
+        return errorResponse(status, sanitize(rawMessage), request)
     }
 
     @ExceptionHandler(EntityNotFoundException::class)
@@ -145,13 +141,10 @@ class GlobalExceptionHandler {
         request: HttpServletRequest
     ): ResponseEntity<ApiError> {
         logger.warn("Entity not found for {} {}: {}", request.method, request.requestURI, ex.message, ex)
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-            ApiError(
-                status = HttpStatus.NOT_FOUND.value(),
-                error = HttpStatus.NOT_FOUND.reasonPhrase,
-                message = ex.message ?: "Resource not found",
-                path = request.requestURI
-            )
+        return errorResponse(
+            HttpStatus.NOT_FOUND,
+            sanitize(ex.message ?: "Resource not found"),
+            request
         )
     }
 
@@ -161,13 +154,6 @@ class GlobalExceptionHandler {
         request: HttpServletRequest
     ): ResponseEntity<ApiError> {
         logger.error("Unhandled exception for {} {}", request.method, request.requestURI, ex)
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-            ApiError(
-                status = HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                error = HttpStatus.INTERNAL_SERVER_ERROR.reasonPhrase,
-                message = "Unexpected error occurred",
-                path = request.requestURI
-            )
-        )
+        return errorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred", request)
     }
 }

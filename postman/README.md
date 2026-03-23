@@ -1,49 +1,52 @@
-# Saving Planner Postman Files
+# Saving Planner Postman Notes
 
-## Files
+## Current state of this folder
 
-- `saving-planner.postman_collection.json` — API requests for users and personal finance
-- `saving-planner.local.postman_environment.json` — local variables for `http://localhost:8080`
+At the moment, this `postman/` folder contains documentation only.
 
-## Import steps
+If you want to keep Postman assets in the repository later, this is the right place for files such as:
 
-1. Open Postman.
-2. Click **Import**.
-3. Import both JSON files from this folder.
-4. Select the **Saving Planner Local** environment.
-5. Start the Spring Boot app.
+- `saving-planner.postman_collection.json`
+- `saving-planner.local.postman_environment.json`
 
 ## Current default auth
 
-The collection uses collection-level **Basic Auth** with environment variables:
+The API currently uses **Basic Auth** with the credentials defined in `SecurityConfig`:
 
-- username: `admin`
-- password: `password`
+- username: `<username>`
+- password: `<password>`
 
-If you change the credentials in `SecurityConfig`, update the Postman environment as well.
+If you change the credentials in `SecurityConfig`, update your Postman environment as well.
+
+## Base URLs
+
+Use the base URL that matches how the backend is running:
+
+- local Gradle / IntelliJ run: `http://localhost:8080`
+- Docker Compose app run: `http://localhost:8081`
 
 ## Recommended request order
 
 ### Users
 
-1. `Create User`
-2. `Get All Users`
-   - this stores the first returned `id` into `userId`
-3. `Get User By Id`
-4. `Get All User Info By Id`
-5. `Update User`
-6. `Delete User`
+1. `POST /api/v1/users/user`
+2. `GET /api/v1/users`
+3. `GET /api/v1/users/{userId}`
+4. `GET /api/v1/users/allinfo/{userId}`
+5. `PUT /api/v1/users/{userId}`
+6. `DELETE /api/v1/users/{userId}`
 
 ### Personal Finance
 
-1. `Create Personal Finance Overview`
-2. `Get All Personal Finance Overviews`
-   - this stores the first returned `id` into `financeId`
-3. `Get Personal Finance Overview By Id`
+1. `POST /api/v1/finance/overview/create`
+2. `GET /api/v1/finance/overview`
+3. `GET /api/v1/finance/overview/{financeId}`
+4. `PUT /api/v1/finance/overview/{financeId}`
 
 ## Notes
 
-- All endpoints require authentication.
-- The create endpoints return a success string, not the generated entity ID.
-- The `Get All ...` requests include a small test script that saves the first returned ID into the Postman environment.
-
+- All endpoints currently require authentication.
+- User creation returns a JSON message wrapper.
+- Some other write endpoints return plain success strings.
+- `CreateUserRequest` accepts `password` and alias `passwordHash`.
+- `CreateUserRequest` accepts `telephoneNumber` and alias `phoneNumber`.
