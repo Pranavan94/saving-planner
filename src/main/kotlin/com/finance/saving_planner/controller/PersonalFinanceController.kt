@@ -40,7 +40,7 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
     fun registerPersonalFinance(@RequestBody personalFinance: PersonalFinanceOverviewDTO): String {
         logger.info("POST {} - create personal finance overview", "$BASE_PATH/finance")
         val savedFinance = personalFinanceService.createPersonalFinanceOverview(personalFinance)
-        return "Personal Finance Overview with id: ${savedFinance.id} created successfully";
+        return "Personal Finance Overview with id: ${savedFinance.id} created successfully"
     }
 
     @GetMapping(PATH_FIND)
@@ -55,7 +55,7 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
     fun updatePersonalFinanceOverview(@PathVariable financeId: UUID, @RequestBody body: JsonNode): String {
         logger.info("PUT {}/{} - update personal finance overview", BASE_PATH, body)
          personalFinanceService.updatePersonalFinanceOverview(financeId, body)
-        return "Personal Finance Overview with id: $financeId updated successfully";
+        return "Personal Finance Overview with id: $financeId updated successfully"
     }
 
     @DeleteMapping(PATH_FIND)
