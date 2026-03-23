@@ -8,8 +8,11 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
+import jakarta.persistence.EntityNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -51,8 +54,19 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
     @PutMapping(PATH_FIND)
     fun updatePersonalFinanceOverview(@PathVariable financeId: UUID, @RequestBody body: JsonNode): String {
         logger.info("PUT {}/{} - update personal finance overview", BASE_PATH, body)
-        val updatedFinance = personalFinanceService.updatePersonalFinanceOverview(financeId, body)
+         personalFinanceService.updatePersonalFinanceOverview(financeId, body)
         return "Personal Finance Overview with id: $financeId updated successfully";
+    }
+
+    @DeleteMapping(PATH_FIND)
+    fun deletePersonalFinanceOverview(@PathVariable financeId: UUID) : ResponseEntity<String> {
+        logger.info("DELETE {}/{} - delete personal finance overview", BASE_PATH, financeId)
+        try {
+            val result = personalFinanceService.deletePersonalFinanceOverview(financeId)
+            return ResponseEntity.ok(result)
+        } catch (e: EntityNotFoundException) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.message ?: "Saving Overview not found")
+        }
     }
 
     // all users
