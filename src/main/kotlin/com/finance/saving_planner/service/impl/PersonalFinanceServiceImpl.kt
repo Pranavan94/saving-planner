@@ -40,13 +40,10 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
         return personalFinanceRepository.findAll()
     }
 
-    override fun updatePersonalFinanceOverview(personalFinance: JsonNode): String {
-        val financeId = personalFinance["id"]?.asText()?.takeIf { it.isNotBlank() }
-            ?: throw IllegalArgumentException("Personal Finance Overview id is required")
-        logger.info("Updating personal finance overview with id {}", financeId)
-
-        val finance = personalFinanceRepository.findById(UUID.fromString(financeId))
-            .orElseThrow { IllegalArgumentException("Personal Finance Overview with ID $financeId not found") }
+    override fun updatePersonalFinanceOverview(financeId: UUID, personalFinance: JsonNode): String {
+        val finance = personalFinanceRepository.findById(financeId).orElseThrow {
+            throw IllegalArgumentException("Personal Finance Overview id is required")
+        }
 
         val updatedFinanceOverview = finance.copy(
             startDate = parseDate(personalFinance, "startDate", finance.startDate),

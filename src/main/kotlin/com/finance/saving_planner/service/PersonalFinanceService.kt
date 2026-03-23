@@ -11,7 +11,7 @@ interface PersonalFinanceService {
 
     fun getTotalOverview(): Collection<PersonalFinance>
 
-    fun updatePersonalFinanceOverview(personalFinance: JsonNode): String
+    fun updatePersonalFinanceOverview(financeId: UUID, personalFinance: JsonNode): String
 
     fun deletePersonalFinanceOverview(financeId: UUID): String
 

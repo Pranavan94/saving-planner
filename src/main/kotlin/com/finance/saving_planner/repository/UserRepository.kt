@@ -28,8 +28,5 @@ interface UserRepository : JpaRepository<User, UUID> {
     """,
     )
     fun getAllUserInfoDTO(@Param("userId") userId: UUID): AllUserInfoDTO?
-
-    @Query("SELECT u.companyId FROM User u WHERE u.id = :userId")
-    fun findUserBy(@Param("userId") userId: UUID): UUID?
 }
 

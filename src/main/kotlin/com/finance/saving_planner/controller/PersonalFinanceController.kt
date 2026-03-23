@@ -1,5 +1,6 @@
 package com.finance.saving_planner.controller
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.finance.saving_planner.dto.PersonalFinanceOverviewDTO
 import com.finance.saving_planner.model.PersonalFinance
 import com.finance.saving_planner.service.PersonalFinanceService
@@ -12,6 +13,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -44,6 +46,13 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
         val result = personalFinanceService.getPersonalFinanceOverview(financeId)
         logger.debug("Finance overview result for {}: {}", financeId, result)
         return result
+    }
+
+    @PutMapping(PATH_FIND)
+    fun updatePersonalFinanceOverview(@PathVariable financeId: UUID, @RequestBody body: JsonNode): String {
+        logger.info("PUT {}/{} - update personal finance overview", BASE_PATH, body)
+        val updatedFinance = personalFinanceService.updatePersonalFinanceOverview(financeId, body)
+        return "Personal Finance Overview with id: $financeId updated successfully";
     }
 
     // all users
