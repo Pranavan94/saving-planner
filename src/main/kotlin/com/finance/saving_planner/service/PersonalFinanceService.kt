@@ -7,7 +7,7 @@ import java.util.UUID
 
 interface PersonalFinanceService {
 
-    fun createPersonalFinanceOverview(personalFinance: PersonalFinance): String
+    fun createPersonalFinanceOverview(personalFinanceDto: PersonalFinanceOverviewDTO): PersonalFinance
 
     fun getTotalOverview(): Collection<PersonalFinance>
 

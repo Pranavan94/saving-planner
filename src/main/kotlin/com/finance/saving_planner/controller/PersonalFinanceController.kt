@@ -30,11 +30,12 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
     }
 
     // register here
-    @PostMapping("/finance")
+    @PostMapping("/create")
     @ResponseStatus(HttpStatus.CREATED)
-    fun registerPersonalFinance(@RequestBody personalFinance: PersonalFinance): String {
+    fun registerPersonalFinance(@RequestBody personalFinance: PersonalFinanceOverviewDTO): String {
         logger.info("POST {} - create personal finance overview", "$BASE_PATH/finance")
-        return personalFinanceService.createPersonalFinanceOverview(personalFinance)
+        val savedFinance = personalFinanceService.createPersonalFinanceOverview(personalFinance)
+        return "Personal Finance Overview with id: ${savedFinance.id} created successfully";
     }
 
     @GetMapping(PATH_FIND)

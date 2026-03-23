@@ -4,7 +4,7 @@ import java.util.Date
 import java.util.UUID
 
 data class PersonalFinanceOverviewDTO(
-    val id: UUID,
+    val id: UUID?,
     val startDate: Date?,
     val endDate: Date?,
     val monthlyIncome: Double,

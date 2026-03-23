@@ -6,7 +6,6 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-import jakarta.validation.constraints.NotBlank
 import java.time.LocalDateTime
 import java.util.Date
 import java.util.UUID
@@ -18,18 +17,15 @@ data class PersonalFinance (
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(columnDefinition = "UUID")
     val id: UUID? = null,
-    val startDate: Date,
-    val endDate: Date,
-    @NotBlank
+    val startDate: Date?,
+    val endDate: Date?,
     val monthlyIncome: Double,
-    @NotBlank
     val monthlyExpenses: Double,
-    @NotBlank
     val consumption: Double,
-    val savings: Double,
-    val investments: Double,
-    val mortgagePayment: Double,
-    val foodBudget: Double,
+    val savings: Double?,
+    val investments: Double?,
+    val mortgagePayment: Double?,
+    val foodBudget: Double?,
     @Column(updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val updatedAt: LocalDateTime = LocalDateTime.now(),

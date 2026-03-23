@@ -10,6 +10,10 @@ group = "com.finance"
 version = "0.0.1-SNAPSHOT"
 description = "Personal savings planning and budgeting application"
 
+val testcontainersVersion = "1.21.4"
+
+extra["testcontainers.version"] = testcontainersVersion
+
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
@@ -34,17 +38,12 @@ dependencies {
 	runtimeOnly("org.postgresql:postgresql")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test") {
-		exclude(group = "org.mockito") // Avoid conflicts if using Mockk
+		exclude(group = "org.mockito")
 	}
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.mockito:mockito-core")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
-	testImplementation("org.junit.jupiter:junit-jupiter-api")
-	testImplementation("org.mockito.kotlin:mockito-kotlin:4.1.0")
-	testImplementation("io.mockk:mockk:1.13.2")
-	testImplementation("org.testcontainers:junit-jupiter")
 	testImplementation("org.testcontainers:postgresql")
-	testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 	testImplementation(kotlin("test"))
 }
 
