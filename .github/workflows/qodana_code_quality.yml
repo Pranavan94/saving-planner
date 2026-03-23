@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - master
+      - main
 
 jobs:
   qodana:
@@ -19,11 +20,20 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: 'Qodana Scan'
+
+      - name: Explain skipped Qodana run when token is missing
+        if: ${{ secrets.QODANA_TOKEN == '' }}
+        run: |
+          echo "Qodana scan skipped: repository secret QODANA_TOKEN is not configured."
+          echo "Release Qodana linters require a Qodana Cloud token."
+          echo "Create a token in https://qodana.cloud and save it as the GitHub Actions secret QODANA_TOKEN."
+
+      - name: Qodana Scan
+        if: ${{ secrets.QODANA_TOKEN != '' }}
         uses: JetBrains/qodana-action@v2025.3
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}

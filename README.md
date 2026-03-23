@@ -14,6 +14,31 @@ This README reflects the current codebase configuration:
 - Docker support for running the app together with PostgreSQL
 - Testcontainers-based PostgreSQL integration tests
 
+## Qodana code quality checks
+
+This repository includes a GitHub Actions workflow at `.github/workflows/qodana_code_quality.yml` and a Qodana config in `qodana.yaml`.
+
+The configured linter is:
+
+```yaml
+linter: jetbrains/qodana-jvm:2025.3
+```
+
+That is a release Qodana linter, which requires a Qodana Cloud access token.
+
+If the GitHub repository secret `QODANA_TOKEN` is missing, the workflow now skips the Qodana scan with a clear message instead of failing the pipeline.
+
+To enable Qodana in GitHub Actions:
+
+1. Create a token at `https://qodana.cloud`
+2. Open **GitHub → Settings → Secrets and variables → Actions**
+3. Add a repository secret named `QODANA_TOKEN`
+
+Notes:
+
+- `No cache found` is normal on a first run or after cache key changes.
+- The missing `QODANA_TOKEN` is the real reason the Qodana job fails with the current release linter.
+
 ## Runtime defaults verified from the project
 
 ### Application ports
