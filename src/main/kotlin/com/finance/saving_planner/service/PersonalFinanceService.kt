@@ -9,7 +9,7 @@ interface PersonalFinanceService {
 
     fun createPersonalFinanceOverview(personalFinanceDto: PersonalFinanceOverviewDTO): PersonalFinance
 
-    fun getTotalOverview(): Collection<PersonalFinance>
+    fun getTotalOverview(): Collection<PersonalFinanceOverviewDTO>
 
     fun updatePersonalFinanceOverview(financeId: UUID, personalFinance: JsonNode): String
 

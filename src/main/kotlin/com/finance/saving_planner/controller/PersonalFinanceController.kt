@@ -2,7 +2,6 @@ package com.finance.saving_planner.controller
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.finance.saving_planner.dto.PersonalFinanceOverviewDTO
-import com.finance.saving_planner.model.PersonalFinance
 import com.finance.saving_planner.service.PersonalFinanceService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -75,13 +74,13 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
         responses = [
             ApiResponse(
                 responseCode = "200",
-                content = [Content(schema = Schema(implementation = PersonalFinance::class))],
+                content = [Content(schema = Schema(implementation = PersonalFinanceOverviewDTO::class))],
             ),
             ApiResponse(responseCode = "404", description = "No overview found"),
         ],
     )
     @GetMapping(PATH_FIND_ALL)
-    fun getTotalOverview(): Collection<PersonalFinance> {
+    fun getTotalOverview(): Collection<PersonalFinanceOverviewDTO> {
         logger.info("GET {} - fetch all personal finance overviews", BASE_PATH)
         return personalFinanceService.getTotalOverview()
     }

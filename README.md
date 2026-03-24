@@ -1,6 +1,6 @@
 # Saving Planner
 
-Spring Boot + Kotlin API for user registration and personal finance planning.
+Spring Boot + Kotlin backend for user registration and personal finance planning.
 
 ## Current project setup
 
@@ -10,46 +10,22 @@ This README reflects the current codebase configuration:
 - Spring Boot `3.3.5`
 - Java toolchain `21`
 - PostgreSQL as the runtime database
-- Spring Security with **HTTP Basic authentication**
-- Docker support for running the app together with PostgreSQL
+- Spring Security with HTTP Basic authentication
+- CORS enabled for local frontend development
+- Docker support for running the app with PostgreSQL
 - Testcontainers-based PostgreSQL integration tests
 
-## Qodana code quality checks
-
-This repository includes a GitHub Actions workflow at `.github/workflows/qodana_code_quality.yml` and a Qodana config in `qodana.yaml`.
-
-The configured linter is:
-
-```yaml
-linter: jetbrains/qodana-jvm:2025.3
-```
-
-That is a release Qodana linter, which requires a Qodana Cloud access token.
-
-If the GitHub repository secret `QODANA_TOKEN` is missing, the workflow now skips the Qodana scan with a clear message instead of failing the pipeline.
-
-To enable Qodana in GitHub Actions:
-
-1. Create a token at `https://qodana.cloud`
-2. Open **GitHub → Settings → Secrets and variables → Actions**
-3. Add a repository secret named `QODANA_TOKEN`
-
-Notes:
-
-- `No cache found` is normal on a first run or after cache key changes.
-- The missing `QODANA_TOKEN` is the real reason the Qodana job fails with the current release linter.
-
-## Runtime defaults verified from the project
+## Runtime defaults
 
 ### Application ports
 
-- **Local app run:** `http://localhost:8080`
-- **Docker app run:** `http://localhost:8081`
+- Local app run: `http://localhost:8080`
+- Docker Compose app run: `http://localhost:8081`
 
 ### Database ports
 
-- **Local PostgreSQL expected by default:** `localhost:5433`
-- **Docker PostgreSQL exposed to host:** `localhost:5434`
+- Local PostgreSQL expected by default: `localhost:5433`
+- Docker PostgreSQL exposed to the host: `localhost:5434`
 
 ### Default HTTP Basic credentials
 
@@ -58,13 +34,15 @@ The current `SecurityConfig` defines one in-memory user:
 - username: `<username>`
 - password: `<password>`
 
-> This is the credential for calling the secured API right now. Because credentials are explicitly configured in `SecurityConfig`, Spring Boot will **not** print an auto-generated password in the logs.
+Because the credentials are explicitly configured in `SecurityConfig`, Spring Boot will not print an auto-generated password in the logs.
 
-### Default CORS setup
+### Default CORS origin
 
-Browser requests are currently allowed from:
+Browser requests are allowed from:
 
 - `http://localhost:3000`
+
+You can override this with the `CORS_ALLOWED_ORIGINS` environment variable.
 
 ## Database configuration
 
@@ -74,17 +52,11 @@ The application is configured to use PostgreSQL:
 - username: `${DB_USERNAME:<username>}`
 - password: `${DB_PASSWORD:<password>}`
 
-Hibernate SQL logs are **off by default** in `application.properties`.
-
-If you want extra SQL logging during development, use the local profile:
-
-```powershell
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
-```
+Hibernate SQL logging is off by default in `src/main/resources/application.properties`.
 
 ## Run locally without Docker
 
-Make sure PostgreSQL is running locally and accessible on port `5433`, or provide your own values with environment variables.
+Make sure PostgreSQL is running locally and accessible on port `5433`, or override the connection with environment variables.
 
 ### Option 1: use the defaults
 
@@ -96,13 +68,13 @@ This works if your local database matches:
 - username: `<username>`
 - password: `<password>`
 
-Then run:
+Run the app:
 
 ```powershell
 .\gradlew.bat bootRun
 ```
 
-### Option 2: override database settings for the current terminal session
+### Option 2: override the database settings for the current terminal session
 
 ```powershell
 $env:DB_HOST="<dbhost>"
@@ -113,18 +85,17 @@ $env:DB_PASSWORD="<dbpassword>"
 .\gradlew.bat bootRun
 ```
 
+### Build the runnable jar
+
+```powershell
+.\gradlew.bat bootJar
+```
+
+The jar is created under `build/libs/`.
+
 ## Run with Docker Compose
 
-This project includes:
-
-- `Dockerfile`
-- `docker-compose.yml`
-- `.dockerignore`
-
-The Compose stack starts:
-
-- the Spring Boot app in one container
-- PostgreSQL in another container
+This project includes a `Dockerfile` and `docker-compose.yml` for running the Spring Boot app together with PostgreSQL.
 
 ### Start the full stack
 
@@ -156,23 +127,21 @@ docker compose down -v
 docker compose logs -f
 ```
 
-App logs only:
+Only the app logs:
 
 ```powershell
 docker compose logs -f app
 ```
 
-PostgreSQL logs only:
+Only the database logs:
 
 ```powershell
 docker compose logs -f postgres
 ```
 
-## Docker environment variables
+## Docker `.env` configuration
 
-`docker-compose.yml` expects a `.env` file for PostgreSQL and app configuration.
-
-The current Compose file uses these variable names:
+`docker-compose.yml` expects a `.env` file with these variables:
 
 - `PSQL_DB_HOST_NAME`
 - `PSQL_DB_PORT`
@@ -188,34 +157,47 @@ The app container maps them to:
 - `DB_USERNAME`
 - `DB_PASSWORD`
 
-## Test the API
+- inside the Compose network, the app should connect to the `postgres` service on port `5432`
+- from your host machine, PostgreSQL is exposed on `localhost:5434`
+- the app container is exposed on `localhost:8081`
 
-All endpoints currently require Basic Auth.
+The Docker image is built with:
+
+```text
+./gradlew bootJar --no-daemon -x test
+```
+
+so image builds skip tests during the Docker build stage.
+
+## Authentication and API usage
+
+All endpoints currently require HTTP Basic authentication.
 
 ### PowerShell example
 
 ```powershell
-$pair = 'username:password'
+$pair = 'admin:password'
 $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
 $token = [Convert]::ToBase64String($bytes)
-Invoke-WebRequest -Uri "http://localhost:8081/api/v1/users" -Headers @{ Authorization = "Basic $token" }
+
+Invoke-WebRequest -Uri "http://localhost:8080/api/v1/users" -Headers @{ Authorization = "Basic $token" }
 ```
 
-If the app is running in Docker, use port `8081` instead.
+If you run the backend in Docker, use port `8081` instead of `8080`.
 
 ## Frontend integration notes
 
-The backend currently supports browser calls from `http://localhost:3000`.
+The backend is currently configured for browser calls from `http://localhost:3000`.
 
-To allow multiple frontend origins before starting the backend:
+To allow more than one frontend origin before starting the backend:
 
 ```powershell
 $env:CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
 ```
 
-Because the API currently uses **Basic Auth headers**, frontend requests should send the `Authorization` header. Cookie-based auth is not configured.
+Because the API uses Basic Auth headers, frontend requests must send the `Authorization` header. Cookie-based login is not configured.
 
-Example frontend request:
+Example frontend request for user creation:
 
 ```javascript
 const credentials = btoa('username:password');
@@ -241,8 +223,8 @@ const response = await fetch('<localhost:url>/api/v1/users/user', {
 
 Notes:
 
-- `CreateUserRequest` accepts `password`, and also supports alias `passwordHash`
-- `CreateUserRequest` accepts `telephoneNumber`, and also supports alias `phoneNumber`
+- `CreateUserRequest` accepts `password` and alias `passwordHash`
+- `CreateUserRequest` accepts `telephoneNumber` and alias `phoneNumber`
 - telephone numbers are normalized to digits before persistence
 
 ## Main endpoints
@@ -266,14 +248,56 @@ Base path: `/api/v1/finance/overview`
 - `GET /api/v1/finance/overview`
 - `GET /api/v1/finance/overview/{financeId}`
 - `PUT /api/v1/finance/overview/{financeId}`
+- `DELETE /api/v1/finance/overview/{financeId}`
+
+The finance read endpoints now return DTO responses instead of exposing JPA entities directly. This avoids Hibernate lazy-proxy serialization issues for nested `monthlyExpenses`, `insurances`, and `subscriptions`.
+
+## Example personal finance create request
+
+`POST /api/v1/finance/overview/create`
+
+```json
+{
+  "startDate": "2026-03-01T00:00:00Z",
+  "endDate": "2026-03-31T00:00:00Z",
+  "monthlyIncome": 30000.0,
+  "monthlyExpenses": {
+    "mortgagePayment": 5000.0,
+    "sharedHouseCost": 1000.0,
+    "foodBudget": 2500.0,
+    "carLoan": 1000.0,
+    "creditCardBill": 2500.0,
+    "electricityBill": 1000.0,
+    "studentLoans": 2000.0,
+    "tollFees": 500.0,
+    "insurances": [
+      {
+        "insuranceType": "health insurance",
+        "insuranceCost": 1000.0,
+        "insuranceCompany": "CVS Health"
+      }
+    ],
+    "subscriptions": [
+      {
+        "subscriptionName": "Netflix",
+        "subscriptionCost": 100.0
+      }
+    ]
+  },
+  "consumption": 2500.0,
+  "savings": 5000.0,
+  "investments": 4000.0
+}
+```
+
+Notes:
+
+- `insurances` must be a JSON array
+- `subscriptions` must be a JSON array
+- use `subscriptionName`, not `subscriptionType`
+- successful create/update finance endpoints currently return plain success strings rather than JSON objects
 
 ## Build and test
-
-Build the jar:
-
-```powershell
-.\gradlew.bat bootJar
-```
 
 Run all tests:
 
@@ -281,7 +305,13 @@ Run all tests:
 .\gradlew.bat test
 ```
 
-The project includes PostgreSQL integration tests via Testcontainers.
+Run only the finance service tests:
+
+```powershell
+.\gradlew.bat test --tests "com.finance.saving_planner.service.impl.PersonalFinanceServiceImplTest"
+```
+
+The test suite includes PostgreSQL integration tests backed by Testcontainers. Docker must be running for those tests to pass.
 
 ## Troubleshooting
 
@@ -301,12 +331,45 @@ Make sure PostgreSQL is running and these values are correct for your environmen
 
 ### Docker app cannot connect to PostgreSQL
 
-Inside Docker Compose, the app should connect using the configured container host from `.env`, typically the PostgreSQL service name.
+Inside Docker Compose, the app should connect to the configured PostgreSQL service name, typically `postgres`, on container port `5432`.
+
+### Database insert fails after entity refactors
+
+If you refactor entities such as `PersonalFinance` and `MonthlyExpenses`, an older local PostgreSQL schema can keep stale columns or `NOT NULL` constraints. In that case, reset the local schema or drop the outdated tables before restarting the app.
 
 ### Browser request blocked by CORS
 
-Make sure the frontend origin is included in `CORS_ALLOWED_ORIGINS` or leave the default `http://localhost:3000`.
+Make sure the frontend origin is included in `CORS_ALLOWED_ORIGINS`, or use the default `http://localhost:3000`.
+
+### Port 8080 already in use
+
+Find the process using the port and stop it, or start the app on another port:
+
+```powershell
+netstat -ano | findstr :8080
+.\gradlew.bat bootRun --args="--server.port=8081"
+```
+
+## Qodana code quality checks
+
+This repository includes a GitHub Actions workflow at `.github/workflows/qodana_code_quality.yml` and a Qodana config in `qodana.yaml`.
+
+The configured linter is:
+
+```yaml
+linter: jetbrains/qodana-jvm:2025.3
+```
+
+This release linter requires a Qodana Cloud access token.
+
+If the GitHub repository secret `QODANA_TOKEN` is missing, the workflow skips the Qodana scan with a clear message instead of failing the pipeline.
+
+To enable Qodana in GitHub Actions:
+
+1. Create a token at `https://qodana.cloud`
+2. Open GitHub → Settings → Secrets and variables → Actions
+3. Add a repository secret named `QODANA_TOKEN`
 
 ## Postman note
 
-There is a `postman/README.md` file with additional Postman notes. If you want to keep Postman import files in the repository, place them in the `postman/` folder and document them there.
+There is a `postman/README.md` file with additional Postman notes. If you later add a Postman collection or environment export, place those files in the `postman/` folder.

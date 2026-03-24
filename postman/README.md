@@ -42,6 +42,7 @@ Use the base URL that matches how the backend is running:
 2. `GET /api/v1/finance/overview`
 3. `GET /api/v1/finance/overview/{financeId}`
 4. `PUT /api/v1/finance/overview/{financeId}`
+5. `DELETE /api/v1/finance/overview/{financeId}`
 
 ## Notes
 
@@ -50,3 +51,4 @@ Use the base URL that matches how the backend is running:
 - Some other write endpoints return plain success strings.
 - `CreateUserRequest` accepts `password` and alias `passwordHash`.
 - `CreateUserRequest` accepts `telephoneNumber` and alias `phoneNumber`.
+- Finance create requests expect `monthlyExpenses.insurances` and `monthlyExpenses.subscriptions` as arrays.

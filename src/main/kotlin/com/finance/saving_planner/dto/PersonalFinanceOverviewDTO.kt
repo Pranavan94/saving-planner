@@ -8,10 +8,8 @@ data class PersonalFinanceOverviewDTO(
     val startDate: Date?,
     val endDate: Date?,
     val monthlyIncome: Double,
-    val monthlyExpenses: Double,
+    val monthlyExpenses: MonthlyExpensesDTO,
     val consumption: Double,
     val savings: Double?,
     val investments: Double?,
-    val mortgagePayment: Double?,
-    val foodBudget: Double?,
 )
