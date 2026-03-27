@@ -11,6 +11,7 @@ import jakarta.persistence.EntityNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
 import java.util.UUID
 
 @RestController
@@ -36,6 +38,7 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
     // register here
     @PostMapping("/create")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     fun registerPersonalFinance(@RequestBody personalFinance: PersonalFinanceOverviewDTO): String {
         logger.info("POST {} - create personal finance overview", "$BASE_PATH/finance")
         val savedFinance = personalFinanceService.createPersonalFinanceOverview(personalFinance)
@@ -43,6 +46,7 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
     }
 
     @GetMapping(PATH_FIND)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     fun getFinancialOverviewBy(@PathVariable financeId: UUID): PersonalFinanceOverviewDTO {
         logger.info("GET {}/{} - fetch personal finance overview", BASE_PATH, financeId)
         val result = personalFinanceService.getPersonalFinanceOverview(financeId)
@@ -51,6 +55,7 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
     }
 
     @PutMapping(PATH_FIND)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     fun updatePersonalFinanceOverview(@PathVariable financeId: UUID, @RequestBody body: JsonNode): String {
         logger.info("PUT {}/{} - update personal finance overview", BASE_PATH, body)
          personalFinanceService.updatePersonalFinanceOverview(financeId, body)
@@ -58,6 +63,7 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
     }
 
     @DeleteMapping(PATH_FIND)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     fun deletePersonalFinanceOverview(@PathVariable financeId: UUID) : ResponseEntity<String> {
         logger.info("DELETE {}/{} - delete personal finance overview", BASE_PATH, financeId)
         try {
@@ -80,8 +86,20 @@ class PersonalFinanceController(private val personalFinanceService: PersonalFina
         ],
     )
     @GetMapping(PATH_FIND_ALL)
+    @PreAuthorize("hasRole('ADMIN')")
     fun getTotalOverview(): Collection<PersonalFinanceOverviewDTO> {
         logger.info("GET {} - fetch all personal finance overviews", BASE_PATH)
         return personalFinanceService.getTotalOverview()
+    }
+
+    @PostMapping("/upload")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    fun uploadFile(@RequestBody file: MultipartFile): ResponseEntity<String> {
+        if(file.isEmpty) {
+            return ResponseEntity.badRequest().body("File is empty")
+        }
+        logger.info("POST {} - upload file", BASE_PATH)
+        personalFinanceService.processCsv(file.inputStream)
+        return ResponseEntity.ok("File uploaded successfully")
     }
 }

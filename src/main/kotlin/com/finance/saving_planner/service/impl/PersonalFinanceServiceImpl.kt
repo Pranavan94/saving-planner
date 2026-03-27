@@ -11,21 +11,36 @@ import com.finance.saving_planner.model.PersonalFinance
 import com.finance.saving_planner.model.Subscription
 import com.finance.saving_planner.repository.PersonalFinanceRepository
 import com.finance.saving_planner.service.PersonalFinanceService
+import org.apache.commons.csv.CSVFormat
+import org.apache.commons.csv.CSVRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.io.BufferedReader
+import java.io.InputStream
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.UUID
+import kotlin.math.abs
 
 @Service
 class PersonalFinanceServiceImpl(private val personalFinanceRepository: PersonalFinanceRepository) : PersonalFinanceService {
     companion object {
         private val logger = LoggerFactory.getLogger(PersonalFinanceServiceImpl::class.java)
+        private val csvDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+        private const val csvBatchSize = 1000
     }
 
     override fun createPersonalFinanceOverview(personalFinanceDto: PersonalFinanceOverviewDTO): PersonalFinance {
         logger.info("Creating personal finance overview for period {} to {}", personalFinanceDto.startDate, personalFinanceDto.endDate)
+        validateDateRange(personalFinanceDto.startDate, personalFinanceDto.endDate)
+
         val personalFinanceEntity = PersonalFinance(
             startDate = personalFinanceDto.startDate,
             endDate = personalFinanceDto.endDate,
@@ -48,17 +63,25 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
 
     override fun updatePersonalFinanceOverview(financeId: UUID, personalFinance: JsonNode): String {
         val finance = personalFinanceRepository.findById(financeId).orElseThrow {
-            throw IllegalArgumentException("Personal Finance Overview id is required")
+            IllegalArgumentException("Personal Finance Overview with ID $financeId not found")
         }
 
+        val updatedStartDate = parseDate(personalFinance, "startDate", finance.startDate)
+        val updatedEndDate = parseDate(personalFinance, "endDate", finance.endDate)
+        validateDateRange(updatedStartDate, updatedEndDate)
+
         val updatedFinanceOverview = finance.copy(
-            startDate = parseDate(personalFinance, "startDate", finance.startDate),
-            endDate = parseDate(personalFinance, "endDate", finance.endDate),
-            monthlyIncome = personalFinance["monthlyIncome"]?.asDouble() ?: finance.monthlyIncome,
-            monthlyExpenses = personalFinance["monthlyExpenses"]?.let { createMonthlyExpensesFrom(it, finance.monthlyExpenses) } ?: finance.monthlyExpenses,
-            consumption = personalFinance["consumption"]?.asDouble() ?: finance.consumption,
-            savings = personalFinance["savings"]?.asDouble() ?: finance.savings,
-            investments = personalFinance["investments"]?.asDouble() ?: finance.investments,
+            startDate = updatedStartDate,
+            endDate = updatedEndDate,
+            monthlyIncome = personalFinance.readDoubleOrCurrent("monthlyIncome", finance.monthlyIncome),
+            monthlyExpenses = personalFinance["monthlyExpenses"]?.let {
+                require(it.isObject) { "Field 'monthlyExpenses' must be an object" }
+                createMonthlyExpensesFrom(it, finance.monthlyExpenses)
+            } ?: finance.monthlyExpenses,
+            consumption = personalFinance.readDoubleOrCurrent("consumption", finance.consumption),
+            savings = personalFinance.readNullableDouble("savings", finance.savings),
+            investments = personalFinance.readNullableDouble("investments", finance.investments),
+            updatedAt = LocalDateTime.now(),
         )
 
         val savedFinanceOverview = personalFinanceRepository.save(updatedFinanceOverview)
@@ -83,6 +106,46 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
         return personalFinanceRepository.findByFinanceId(financeId)?.let(::toPersonalFinanceOverviewDto)?.also {
             logger.debug("Fetched personal finance overview with id {}", financeId)
         } ?: throw IllegalArgumentException("Personal Finance Overview with ID $financeId not found")
+    }
+
+    @Transactional
+    override fun processCsv(inputStream: InputStream) {
+        val format = CSVFormat.DEFAULT.builder()
+            .setHeader()
+            .setSkipHeaderRecord(true)
+            .setIgnoreHeaderCase(true)
+            .setTrim(true)
+            .get()
+
+        BufferedReader(InputStreamReader(inputStream, StandardCharsets.UTF_8)).use { reader ->
+            format.parse(reader).use { parser ->
+                val batch = mutableListOf<PersonalFinance>()
+
+                for (record in parser) {
+                    batch.add(createPersonalFinanceFromCsvRecord(record))
+
+                    if (batch.size >= csvBatchSize) {
+                        saveBatch(batch)
+                    }
+                }
+
+                saveBatch(batch)
+            }
+        }
+    }
+
+    private fun parseCsvDate(value: String): Date {
+        val localDate = try {
+            LocalDate.parse(value.trim(), csvDateFormatter)
+        } catch (exception: Exception) {
+            throw IllegalArgumentException("Invalid CSV date '$value'. Expected format: dd.MM.yyyy", exception)
+        }
+
+        return Date.from(
+            localDate
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()
+        )
     }
 
     private fun parseDate(personalFinance: JsonNode, fieldName: String, currentValue: Date?): Date? {
@@ -155,23 +218,15 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
     private fun createMonthlyExpensesFrom(jsonNode: JsonNode, currentMonthlyExpenses: MonthlyExpenses) : MonthlyExpenses {
         logger.info("Creating monthly expenses from JSON payload")
 
-        val insurances = jsonNode["insurances"]
-            ?.takeIf { it.isArray }
-            ?.map(::createInsuranceFrom)
-            ?.toMutableList()
-            ?: currentMonthlyExpenses.insurances.toMutableList()
+        val insurances = jsonNode.readArrayOrCurrent("insurances", currentMonthlyExpenses.insurances, ::createInsuranceFrom)
 
-        val subscriptions = jsonNode["subscriptions"]
-            ?.takeIf { it.isArray }
-            ?.map(::createSubscriptionFrom)
-            ?.toMutableList()
-            ?: currentMonthlyExpenses.subscriptions.toMutableList()
+        val subscriptions = jsonNode.readArrayOrCurrent("subscriptions", currentMonthlyExpenses.subscriptions, ::createSubscriptionFrom)
 
         return MonthlyExpenses(
             id = parseUuid(jsonNode["id"], currentMonthlyExpenses.id),
-            mortgagePayment = jsonNode["mortgagePayment"]?.asDouble() ?: currentMonthlyExpenses.mortgagePayment,
-            sharedHouseCost = jsonNode["sharedHouseCost"]?.asDouble() ?: currentMonthlyExpenses.sharedHouseCost,
-            foodBudget = jsonNode["foodBudget"]?.asDouble() ?: currentMonthlyExpenses.foodBudget,
+            mortgagePayment = jsonNode.readDoubleOrCurrent("mortgagePayment", currentMonthlyExpenses.mortgagePayment),
+            sharedHouseCost = jsonNode.readDoubleOrCurrent("sharedHouseCost", currentMonthlyExpenses.sharedHouseCost),
+            foodBudget = jsonNode.readDoubleOrCurrent("foodBudget", currentMonthlyExpenses.foodBudget),
             carLoan = jsonNode.readNullableDouble("carLoan", currentMonthlyExpenses.carLoan),
             creditCardBill = jsonNode.readNullableDouble("creditCardBill", currentMonthlyExpenses.creditCardBill),
             electricityBill = jsonNode.readNullableDouble("electricityBill", currentMonthlyExpenses.electricityBill),
@@ -223,6 +278,13 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
         return field.asDouble()
     }
 
+    private fun JsonNode.readDoubleOrCurrent(fieldName: String, currentValue: Double): Double {
+        val field = this[fieldName] ?: return currentValue
+        require(!field.isNull) { "Field '$fieldName' cannot be null" }
+        require(field.isNumber) { "Field '$fieldName' must be numeric" }
+        return field.asDouble()
+    }
+
     private fun JsonNode.readNullableDouble(fieldName: String, currentValue: Double?): Double? {
         val field = this[fieldName] ?: return currentValue
         if (field.isNull) {
@@ -231,6 +293,117 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
 
         require(field.isNumber) { "Field '$fieldName' must be numeric" }
         return field.asDouble()
+    }
+
+    private fun <T> JsonNode.readArrayOrCurrent(
+        fieldName: String,
+        currentValue: List<T>,
+        mapper: (JsonNode) -> T,
+    ): MutableList<T> {
+        val field = this[fieldName] ?: return currentValue.toMutableList()
+        require(field.isArray) { "Field '$fieldName' must be an array" }
+        return field.map(mapper).toMutableList()
+    }
+
+    private fun createPersonalFinanceFromCsvRecord(record: CSVRecord): PersonalFinance {
+        val startDate = parseCsvDate(record.getRequiredValue("startDate"))
+        val endDate = parseCsvDate(record.getRequiredValue("endDate"))
+        validateDateRange(startDate, endDate)
+
+        return PersonalFinance(
+            startDate = startDate,
+            endDate = endDate,
+            monthlyIncome = record.getRequiredDouble("monthlyIncome"),
+            monthlyExpenses = MonthlyExpenses(
+                mortgagePayment = record.getDoubleOrDefault("mortgagePayment", normalizeToPositive = true),
+                sharedHouseCost = record.getDoubleOrDefault("sharedHouseCost", normalizeToPositive = true),
+                foodBudget = record.getDoubleOrDefault("foodBudget", normalizeToPositive = true),
+                carLoan = record.getNullableDouble("carLoan", normalizeToPositive = true),
+                creditCardBill = record.getNullableDouble("creditCardBill", normalizeToPositive = true),
+                electricityBill = record.getNullableDouble("electricityBill", normalizeToPositive = true),
+                studentLoans = record.getNullableDouble("studentLoans", normalizeToPositive = true),
+                tollFees = record.getNullableDouble("tollFees", normalizeToPositive = true),
+                subscriptions = mutableListOf(),
+                insurances = mutableListOf(),
+            ),
+            consumption = record.getDoubleOrDefault("consumption", normalizeToPositive = true),
+            savings = record.getDoubleOrDefault("savings", normalizeToPositive = true),
+            investments = record.getDoubleOrDefault("investments", normalizeToPositive = true),
+        )
+    }
+
+    private fun CSVRecord.getRequiredValue(columnName: String): String {
+        val value = this[columnName].trim()
+        require(value.isNotBlank()) { "Field '$columnName' is required in CSV record $recordNumber" }
+        return value
+    }
+
+    private fun CSVRecord.getRequiredDouble(columnName: String): Double {
+        val value = getRequiredValue(columnName)
+        return parseCsvNumericValue(value, columnName, normalizeToPositive = false)
+    }
+
+    private fun CSVRecord.getDoubleOrDefault(
+        columnName: String,
+        defaultValue: Double = 0.0,
+        normalizeToPositive: Boolean = false,
+    ): Double {
+        val value = this[columnName].trim()
+        if (value.isBlank()) {
+            return defaultValue
+        }
+
+        return parseCsvNumericValue(value, columnName, normalizeToPositive)
+    }
+
+    private fun CSVRecord.getNullableDouble(columnName: String, normalizeToPositive: Boolean = false): Double? {
+        val value = this[columnName].trim()
+        if (value.isBlank()) {
+            return null
+        }
+
+        return parseCsvNumericValue(value, columnName, normalizeToPositive)
+    }
+
+    private fun CSVRecord.parseCsvNumericValue(value: String, columnName: String, normalizeToPositive: Boolean): Double {
+        val normalizedValue = value
+            .trim()
+            .replace("−", "-")
+            .replace("–", "-")
+            .replace("—", "-")
+            .replace("\u00A0", "")
+            .replace("\u202F", "")
+            .replace(" ", "")
+
+        val numericValue = when {
+            normalizedValue.contains(',') && normalizedValue.contains('.') -> {
+                if (normalizedValue.lastIndexOf(',') > normalizedValue.lastIndexOf('.')) {
+                    normalizedValue.replace(".", "").replace(',', '.')
+                } else {
+                    normalizedValue.replace(",", "")
+                }
+            }
+            normalizedValue.contains(',') -> normalizedValue.replace(',', '.')
+            else -> normalizedValue
+        }.toDoubleOrNull()
+            ?: throw IllegalArgumentException("Field '$columnName' must be numeric in CSV record $recordNumber")
+
+        return if (normalizeToPositive) abs(numericValue) else numericValue
+    }
+
+    private fun saveBatch(batch: MutableList<PersonalFinance>) {
+        if (batch.isEmpty()) {
+            return
+        }
+
+        personalFinanceRepository.saveAll(batch)
+        batch.clear()
+    }
+
+    private fun validateDateRange(startDate: Date?, endDate: Date?) {
+        if (startDate != null && endDate != null) {
+            require(!endDate.before(startDate)) { "endDate must be greater than or equal to startDate" }
+        }
     }
 
     private fun toPersonalFinanceOverviewDto(personalFinance: PersonalFinance): PersonalFinanceOverviewDTO =

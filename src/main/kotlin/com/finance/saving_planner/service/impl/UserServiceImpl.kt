@@ -4,9 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.finance.saving_planner.dto.AllUserInfoDTO
 import com.finance.saving_planner.dto.CreateUserRequest
 import com.finance.saving_planner.model.User
+import com.finance.saving_planner.model.UserRole
 import com.finance.saving_planner.repository.UserRepository
 import com.finance.saving_planner.service.UserService
 import jakarta.persistence.EntityNotFoundException
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
@@ -19,14 +22,24 @@ class UserServiceImpl(
 ) : UserService {
 
     override fun createUser(request: CreateUserRequest): String {
+        val normalizedEmail = request.email.trim().lowercase()
+        require(!userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            "User with email $normalizedEmail already exists"
+        }
+
+        val requestedRole = UserRole.from(request.role)
+        if (requestedRole == UserRole.ADMIN && !currentUserHasAdminRole()) {
+            throw AccessDeniedException("Only administrators can create admin users")
+        }
+
         val user = User(
             companyId = request.companyId,
-            email = request.email,
+            email = normalizedEmail,
             firstName = request.firstName,
             middleName = request.middleName,
             lastName = request.lastName,
             passwordHash = passwordEncoder.encode(request.password),
-            role = request.role,
+            role = requestedRole.name,
             telephoneNumber = normalizeTelephoneNumber(request.telephoneNumber),
             onboardingDone = request.onboardingDone,
         )
@@ -42,7 +55,7 @@ class UserServiceImpl(
         }
 
         val digitsOnly = rawValue.filter(Char::isDigit)
-        if (digitsOnly.isBlank()) {
+        require(digitsOnly.isBlank()) {
             throw IllegalArgumentException("Invalid telephone number format")
         }
 
@@ -68,7 +81,7 @@ class UserServiceImpl(
             .orElseThrow { IllegalArgumentException("User with ID $userId not found") }
 
         val updatedUser = existingUser.copy(
-            email = user["email"]?.asText() ?: existingUser.email,
+            email = user["email"]?.asText()?.trim()?.lowercase() ?: existingUser.email,
             firstName = user["firstName"]?.asText() ?: existingUser.firstName,
             middleName = user["middleName"]?.asText() ?: existingUser.middleName,
             lastName = user["lastName"]?.asText() ?: existingUser.lastName,
@@ -105,4 +118,9 @@ class UserServiceImpl(
             throw EntityNotFoundException("User with ID $userId not found")
         }
     }
+
+    private fun currentUserHasAdminRole(): Boolean =
+        (SecurityContextHolder.getContext().authentication
+            ?.authorities
+            ?.any { it.authority == UserRole.ADMIN.authority() }) == true
 }

@@ -10,10 +10,11 @@ This README reflects the current codebase configuration:
 - Spring Boot `3.3.5`
 - Java toolchain `21`
 - PostgreSQL as the runtime database
-- Spring Security with HTTP Basic authentication
+- Spring Security with JWT Bearer authentication
 - CORS enabled for local frontend development
 - Docker support for running the app with PostgreSQL
 - Testcontainers-based PostgreSQL integration tests
+- Sensitive runtime credentials sourced from environment variables
 
 ## Runtime defaults
 
@@ -27,14 +28,21 @@ This README reflects the current codebase configuration:
 - Local PostgreSQL expected by default: `localhost:5433`
 - Docker PostgreSQL exposed to the host: `localhost:5434`
 
-### Default HTTP Basic credentials
+### Sensitive runtime configuration
 
-The current `SecurityConfig` defines one in-memory user:
+The application no longer commits sensitive login values into source control.
 
-- username: `<username>`
-- password: `<password>`
+These values must come from environment variables at runtime:
 
-Because the credentials are explicitly configured in `SecurityConfig`, Spring Boot will not print an auto-generated password in the logs.
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `JWT_SECRET`
+
+Optional bootstrap-admin credentials should also come from environment variables if you enable that feature:
+
+- `BOOTSTRAP_ADMIN_ENABLED`
+- `BOOTSTRAP_ADMIN_EMAIL`
+- `BOOTSTRAP_ADMIN_PASSWORD`
 
 ### Default CORS origin
 
@@ -58,30 +66,31 @@ Hibernate SQL logging is off by default in `src/main/resources/application.prope
 
 Make sure PostgreSQL is running locally and accessible on port `5433`, or override the connection with environment variables.
 
-### Option 1: use the defaults
-
-This works if your local database matches:
-
-- host: `<hostname>`
-- port: `<port>`
-- database: `<dbname>`
-- username: `<username>`
-- password: `<password>`
-
-Run the app:
+### Option 1: export the required variables in the current terminal session
 
 ```powershell
+$env:DB_HOST="localhost"
+$env:DB_PORT="5433"
+$env:DB_NAME="saving_planner"
+$env:DB_USERNAME="<dbuser>"
+$env:DB_PASSWORD="<dbpassword>"
+$env:JWT_SECRET="<minimum-32-character-secret>"
 .\gradlew.bat bootRun
 ```
 
-### Option 2: override the database settings for the current terminal session
+### Option 2: enable the bootstrap admin locally
+
+Only set these if you want the app to create an initial admin user on startup:
 
 ```powershell
-$env:DB_HOST="<dbhost>"
-$env:DB_PORT="<dbport>"
-$env:DB_NAME="<dbname>"
-$env:DB_USERNAME="<dbuser>"
-$env:DB_PASSWORD="<dbpassword>"
+$env:BOOTSTRAP_ADMIN_ENABLED="true"
+$env:BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
+$env:BOOTSTRAP_ADMIN_PASSWORD="<strong-password>"
+```
+
+Then start the app in the same terminal:
+
+```powershell
 .\gradlew.bat bootRun
 ```
 
@@ -141,13 +150,30 @@ docker compose logs -f postgres
 
 ## Docker `.env` configuration
 
-`docker-compose.yml` expects a `.env` file with these variables:
+`docker-compose.yml` expects a local `.env` file with these variables.
+
+Start by copying the committed template:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Then fill in your real secrets in `.env`.
+
+The main values are:
 
 - `PSQL_DB_HOST_NAME`
 - `PSQL_DB_PORT`
 - `PSQL_DB_NAME`
 - `PSQL_DB_USER`
 - `PSQL_DB_PASSWORD`
+- `JWT_SECRET`
+
+Optional bootstrap admin variables:
+
+- `BOOTSTRAP_ADMIN_ENABLED`
+- `BOOTSTRAP_ADMIN_EMAIL`
+- `BOOTSTRAP_ADMIN_PASSWORD`
 
 The app container maps them to:
 
@@ -171,16 +197,28 @@ so image builds skip tests during the Docker build stage.
 
 ## Authentication and API usage
 
-All endpoints currently require HTTP Basic authentication.
+The application now uses JWT Bearer tokens.
 
-### PowerShell example
+### Login to get a token
 
 ```powershell
-$pair = 'admin:password'
-$bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
-$token = [Convert]::ToBase64String($bytes)
+$loginBody = @{
+  email = "admin@example.com"
+  password = "<password>"
+} | ConvertTo-Json
 
-Invoke-WebRequest -Uri "http://localhost:8080/api/v1/users" -Headers @{ Authorization = "Basic $token" }
+$loginResponse = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8080/api/v1/auth/login" `
+  -ContentType "application/json" `
+  -Body $loginBody
+```
+
+### Call a protected endpoint
+
+```powershell
+$token = $loginResponse.accessToken
+
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/users" -Headers @{ Authorization = "Bearer $token" }
 ```
 
 If you run the backend in Docker, use port `8081` instead of `8080`.
@@ -195,18 +233,29 @@ To allow more than one frontend origin before starting the backend:
 $env:CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
 ```
 
-Because the API uses Basic Auth headers, frontend requests must send the `Authorization` header. Cookie-based login is not configured.
+Because the API uses Bearer tokens, frontend requests must first call the login endpoint and then send the `Authorization` header. Cookie-based login is not configured.
 
 Example frontend request for user creation:
 
 ```javascript
-const credentials = btoa('username:password');
+const loginResponse = await fetch('<localhost:url>/api/v1/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    email: 'admin@example.com',
+    password: '<password>'
+  })
+});
+
+const { accessToken } = await loginResponse.json();
 
 const response = await fetch('<localhost:url>/api/v1/users/user', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    Authorization: `Basic ${credentials}`
+    Authorization: `Bearer ${accessToken}`
   },
   body: JSON.stringify({
     companyId: crypto.randomUUID(),
@@ -315,9 +364,13 @@ The test suite includes PostgreSQL integration tests backed by Testcontainers. D
 
 ## Troubleshooting
 
-### No generated Spring Security password in logs
+### Application fails to start because a required placeholder cannot be resolved
 
-This is expected. The app defines its own in-memory user in `SecurityConfig`, so Spring Boot does not generate or print a random password.
+Make sure you have exported all required secret environment variables before starting the app:
+
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `JWT_SECRET`
 
 ### Application fails with datasource configuration errors
 

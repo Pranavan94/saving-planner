@@ -15,6 +15,7 @@ import jakarta.persistence.EntityNotFoundException
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -55,6 +56,7 @@ class UserController(private val userService: UserService) {
         ],
     )
     @GetMapping(PATH_FIND)
+    @PreAuthorize("hasRole('ADMIN') or @authorizationService.isCurrentUser(#userId, authentication)")
     fun findUserById(@PathVariable userId: UUID): User {
         val result = userService.getUser(userId)
         println("====>>> findUserById() $result")
@@ -62,6 +64,7 @@ class UserController(private val userService: UserService) {
     }
 
     @GetMapping("/allinfo/{userId}")
+    @PreAuthorize("hasRole('ADMIN') or @authorizationService.isCurrentUser(#userId, authentication)")
     fun getAllUserInfoById(@PathVariable userId: UUID): AllUserInfoDTO {
         val result = userService.getAllUserInfoById(userId)
         println("====>>> getAllUserInfoById() $result")
@@ -80,11 +83,13 @@ class UserController(private val userService: UserService) {
         ],
     )
     @GetMapping(PATH_FIND_ALL)
+    @PreAuthorize("hasRole('ADMIN')")
     fun getAllUsers(): Collection<User> {
         return userService.getAllUsers()
     }
 
     @PutMapping(PATH_FIND)
+    @PreAuthorize("hasRole('ADMIN') or @authorizationService.isCurrentUser(#userId, authentication)")
     fun updateUser(@PathVariable userId: UUID, @RequestBody body: JsonNode): String {
         val result = userService.updateUser(userId, body)
         println("====>>> updateUser() $result")
@@ -92,6 +97,7 @@ class UserController(private val userService: UserService) {
     }
 
     @DeleteMapping(PATH_FIND)
+    @PreAuthorize("hasRole('ADMIN') or @authorizationService.isCurrentUser(#userId, authentication)")
     fun removeUser(@PathVariable userId: UUID): ResponseEntity<String> {
         try {
             val result = userService.deleteUser(userId)

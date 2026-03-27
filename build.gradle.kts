@@ -11,6 +11,10 @@ version = "0.0.1-SNAPSHOT"
 description = "Personal savings planning and budgeting application"
 
 val testcontainersVersion = "1.21.4"
+val encoderVersion = "1.3.1"
+val swaggerVersion="2.2.27"
+val mockitoVersion="5.1.0"
+val apchecommonsVersion="1.14.1"
 
 extra["testcontainers.version"] = testcontainersVersion
 
@@ -29,13 +33,16 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-web")
-	implementation("org.owasp.encoder:encoder:1.3.1")
+	implementation("org.owasp.encoder:encoder:$encoderVersion")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
-	implementation("io.swagger.core.v3:swagger-annotations:2.2.27")
+	implementation("io.swagger.core.v3:swagger-annotations:$swaggerVersion")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+	implementation("org.springframework.security:spring-security-oauth2-jose")
+	implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv")
+	implementation("org.apache.commons:commons-csv:$apchecommonsVersion")
 	
-	// Local PostgreSQL database for the application runtime
+	// Local PostgresSQL database for the application runtime
 	runtimeOnly("org.postgresql:postgresql")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test") {
@@ -43,7 +50,7 @@ dependencies {
 	}
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.mockito:mockito-core")
-	testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+	testImplementation("org.mockito.kotlin:mockito-kotlin:$mockitoVersion")
 	testImplementation("org.testcontainers:postgresql")
 	testImplementation(kotlin("test"))
 }

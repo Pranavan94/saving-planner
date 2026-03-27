@@ -1,6 +1,9 @@
 .git
 .gitignore
 .idea
+.env
+.env.*
+!.env.example
 .gradle
 build
 out

@@ -1,22 +1,31 @@
 # Saving Planner Postman Notes
 
-## Current state of this folder
+## Import order
 
-At the moment, this `postman/` folder contains documentation only.
+1. Import `saving-planner.postman_collection.json`
+2. Import `saving-planner.local.postman_environment.json`
+3. Select the imported environment in Postman
+4. Set `loginPassword` in the environment to match your local `.env` `BOOTSTRAP_ADMIN_PASSWORD`
+5. Run `Auth > Login (bootstrap admin or registered user)` first
 
-If you want to keep Postman assets in the repository later, this is the right place for files such as:
+The login request stores these values automatically into the environment:
 
-- `saving-planner.postman_collection.json`
-- `saving-planner.local.postman_environment.json`
+- `accessToken`
+- `tokenType`
+- `userId`
+- `email`
+- `role`
+- `expiresIn`
 
-## Current default auth
+## Auth model
 
-The API currently uses **Basic Auth** with the credentials defined in `SecurityConfig`:
+The API uses **JWT Bearer authentication**.
 
-- username: `<username>`
-- password: `<password>`
+- `POST /api/v1/auth/login` is public
+- `POST /api/v1/users/user` is public
+- most other endpoints require `Authorization: Bearer <token>`
 
-If you change the credentials in `SecurityConfig`, update your Postman environment as well.
+The included collection already applies Bearer auth to the protected user requests.
 
 ## Base URLs
 
@@ -26,6 +35,19 @@ Use the base URL that matches how the backend is running:
 - Docker Compose app run: `http://localhost:8081`
 
 ## Recommended request order
+
+### Bootstrap admin flow
+
+1. `POST /api/v1/auth/login`
+2. `GET /api/v1/users`
+3. `GET /api/v1/users/{userId}`
+
+### Public registration flow
+
+1. `POST /api/v1/users/user`
+2. Update `loginEmail` / `loginPassword` in the Postman environment if you want to log in as that newly registered user
+3. `POST /api/v1/auth/login`
+4. `GET /api/v1/users/{userId}`
 
 ### Users
 
@@ -46,9 +68,10 @@ Use the base URL that matches how the backend is running:
 
 ## Notes
 
-- All endpoints currently require authentication.
+- `saving-planner.local.postman_environment.json` intentionally leaves `loginPassword` blank so you can fill it from your ignored local `.env` file instead of committing credentials.
 - User creation returns a JSON message wrapper.
 - Some other write endpoints return plain success strings.
 - `CreateUserRequest` accepts `password` and alias `passwordHash`.
 - `CreateUserRequest` accepts `telephoneNumber` and alias `phoneNumber`.
 - Finance create requests expect `monthlyExpenses.insurances` and `monthlyExpenses.subscriptions` as arrays.
+- The included `react-login-example.md` matches the same JWT login flow and local Docker base URL.

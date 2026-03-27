@@ -11,7 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.security.test.context.support.WithAnonymousUser
 import org.springframework.security.test.context.support.WithMockUser
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -29,7 +31,7 @@ import kotlin.test.assertTrue
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@WithMockUser(username = "admin", authorities = ["read"])
+@WithMockUser(username = "admin@saving-planner.local", roles = ["ADMIN"])
 @DisplayName("UserController Integration/Regression Tests")
 class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
 
@@ -41,6 +43,9 @@ class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
 
     @Autowired
     private lateinit var objectMapper: ObjectMapper
+
+    @Autowired
+    private lateinit var passwordEncoder: PasswordEncoder
 
     private val basePath = "/api/v1/users"
     private lateinit var testUser: User
@@ -56,7 +61,7 @@ class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
             firstName = "Regression",
             middleName = "Test",
             lastName = "User",
-            passwordHash = "testHash",
+            passwordHash = passwordEncoder.encode("Password123!"),
             role = "USER",
             telephoneNumber = 9876543210,
             onboardingDone = false,
@@ -86,6 +91,34 @@ class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
                 .content(objectMapper.writeValueAsString(newUser))
         )
             .andExpect(status().isCreated)
+    }
+
+    @Test
+    @DisplayName("RT-001A: POST /api/v1/auth/login returns JWT token for valid credentials")
+    fun testLoginReturnsJwtToken() {
+        val loginRequest = objectMapper.createObjectNode().apply {
+            put("email", "regression.test@example.com")
+            put("password", "Password123!")
+        }
+
+        mockMvc.perform(
+            post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginRequest))
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.accessToken").isNotEmpty)
+            .andExpect(jsonPath("$.tokenType").value("Bearer"))
+            .andExpect(jsonPath("$.email").value("regression.test@example.com"))
+            .andExpect(jsonPath("$.role").value("USER"))
+    }
+
+    @Test
+    @DisplayName("RT-001B: secured endpoint rejects unauthenticated access")
+    @WithAnonymousUser
+    fun testSecuredEndpointWithoutAuthenticationReturnsUnauthorized() {
+        mockMvc.perform(get(basePath))
+            .andExpect(status().isUnauthorized)
     }
 
     @Test
@@ -157,10 +190,12 @@ class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
     @Test
     @DisplayName("RT-008: POST with invalid JSON returns 400 BAD_REQUEST")
     fun testPostWithInvalidJsonReturns400() {
+        val invalidJson = "{" + "\"email\":"
+
         mockMvc.perform(
             post("$basePath/user")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{invalid json content")
+                .content(invalidJson)
         )
             .andExpect(status().isBadRequest)
     }
@@ -224,7 +259,7 @@ class UserControllerRegressionTest : PostgreSQLIntegrationTest() {
             email = "user2@example.com",
             firstName = "User",
             lastName = "Two",
-            passwordHash = "hash",
+            passwordHash = passwordEncoder.encode("Password123!"),
             role = "USER",
             onboardingDone = true,
             createdAt = LocalDateTime.now(),

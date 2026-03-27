@@ -3,6 +3,7 @@ package com.finance.saving_planner.service
 import com.fasterxml.jackson.databind.JsonNode
 import com.finance.saving_planner.dto.PersonalFinanceOverviewDTO
 import com.finance.saving_planner.model.PersonalFinance
+import java.io.InputStream
 import java.util.UUID
 
 interface PersonalFinanceService {
@@ -16,4 +17,6 @@ interface PersonalFinanceService {
     fun deletePersonalFinanceOverview(financeId: UUID): String
 
     fun getPersonalFinanceOverview(financeId: UUID): PersonalFinanceOverviewDTO
+
+    fun processCsv(inputStream: InputStream)
 }
