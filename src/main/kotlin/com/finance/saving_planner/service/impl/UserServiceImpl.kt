@@ -55,7 +55,7 @@ class UserServiceImpl(
         }
 
         val digitsOnly = rawValue.filter(Char::isDigit)
-        require(digitsOnly.isBlank()) {
+        require(digitsOnly.isNotBlank()) {
             throw IllegalArgumentException("Invalid telephone number format")
         }
 

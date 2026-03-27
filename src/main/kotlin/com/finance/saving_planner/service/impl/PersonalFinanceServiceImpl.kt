@@ -91,7 +91,7 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
 
     override fun deletePersonalFinanceOverview(financeId: UUID): String {
         logger.info("Deleting personal finance overview with id {}", financeId)
-        require(!personalFinanceRepository.existsById(financeId)) {
+        require(personalFinanceRepository.existsById(financeId)) {
             throw IllegalArgumentException("Personal Finance Overview with ID $financeId not found")
         }
 
