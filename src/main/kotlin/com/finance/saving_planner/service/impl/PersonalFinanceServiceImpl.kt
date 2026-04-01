@@ -46,7 +46,6 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
             endDate = personalFinanceDto.endDate,
             monthlyIncome = personalFinanceDto.monthlyIncome,
             monthlyExpenses = createMonthlyExpenses(personalFinanceDto),
-            consumption = personalFinanceDto.consumption,
             savings = personalFinanceDto.savings,
             investments = personalFinanceDto.investments,
         )
@@ -78,7 +77,6 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
                 require(it.isObject) { "Field 'monthlyExpenses' must be an object" }
                 createMonthlyExpensesFrom(it, finance.monthlyExpenses)
             } ?: finance.monthlyExpenses,
-            consumption = personalFinance.readDoubleOrCurrent("consumption", finance.consumption),
             savings = personalFinance.readNullableDouble("savings", finance.savings),
             investments = personalFinance.readNullableDouble("investments", finance.investments),
             updatedAt = LocalDateTime.now(),
@@ -122,13 +120,18 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
                 val batch = mutableListOf<PersonalFinance>()
 
                 for (record in parser) {
-                    batch.add(createPersonalFinanceFromCsvRecord(record))
+                    val personalFinance = createPersonalFinanceFromCsvRecord(record)
 
-                    if (batch.size >= csvBatchSize) {
-                        saveBatch(batch)
+                    if(validateCsvRecord(personalFinance)) {
+                        batch.add(personalFinance)
+                        if (batch.size >= csvBatchSize) {
+                            saveBatch(batch)
+                        }
+                    } else {
+                        logger.warn("Skipping invalid CSV record: {}", record)
+                        continue
                     }
                 }
-
                 saveBatch(batch)
             }
         }
@@ -326,7 +329,6 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
                 subscriptions = mutableListOf(),
                 insurances = mutableListOf(),
             ),
-            consumption = record.getDoubleOrDefault("consumption", normalizeToPositive = true),
             savings = record.getDoubleOrDefault("savings", normalizeToPositive = true),
             investments = record.getDoubleOrDefault("investments", normalizeToPositive = true),
         )
@@ -406,6 +408,13 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
         }
     }
 
+    private fun validateCsvRecord(personalFinance: PersonalFinance): Boolean {
+        val collectPersonalFinanceData = personalFinance.monthlyExpenses.getSumOfMonthlyExpenses() +
+                personalFinance.getMonthlyInvestmentsAndSavings();
+
+        return personalFinance.monthlyIncome > collectPersonalFinanceData
+    }
+
     private fun toPersonalFinanceOverviewDto(personalFinance: PersonalFinance): PersonalFinanceOverviewDTO =
         PersonalFinanceOverviewDTO(
             id = personalFinance.id,
@@ -413,7 +422,6 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
             endDate = personalFinance.endDate,
             monthlyIncome = personalFinance.monthlyIncome,
             monthlyExpenses = toMonthlyExpensesDto(personalFinance.monthlyExpenses),
-            consumption = personalFinance.consumption,
             savings = personalFinance.savings,
             investments = personalFinance.investments,
         )

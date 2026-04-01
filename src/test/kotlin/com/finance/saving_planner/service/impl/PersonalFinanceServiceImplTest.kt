@@ -75,7 +75,6 @@ class PersonalFinanceServiceImplTest {
         endDate = Date.from(Instant.parse("2026-03-31T00:00:00Z")),
         monthlyIncome = 5000.0,
         monthlyExpenses = monthlyExpenseDto,
-        consumption = 1200.0,
         savings = 900.0,
         investments = 300.0,
     )
@@ -120,7 +119,6 @@ class PersonalFinanceServiceImplTest {
             endDate = personalFinanceDto.endDate,
             monthlyIncome = 5000.0,
             monthlyExpenses = monthlyExpense,
-            consumption = 1200.0,
             savings = 900.0,
             investments = 300.0,
             createdAt = LocalDateTime.now(),
@@ -137,7 +135,6 @@ class PersonalFinanceServiceImplTest {
             { assertEquals(personalFinanceDto.startDate, financeCaptor.firstValue.startDate) },
             { assertEquals(personalFinanceDto.endDate, financeCaptor.firstValue.endDate) },
             { assertEquals(5000.0, financeCaptor.firstValue.monthlyIncome) },
-            { assertEquals(1200.0, financeCaptor.firstValue.consumption) },
             { assertEquals(900.0, financeCaptor.firstValue.savings) },
             { assertEquals(300.0, financeCaptor.firstValue.investments) },
             { assertEquals(1100.0, financeCaptor.firstValue.monthlyExpenses.mortgagePayment) },
@@ -197,7 +194,6 @@ class PersonalFinanceServiceImplTest {
             endDate = personalFinanceDto.endDate,
             monthlyIncome = 5000.0,
             monthlyExpenses = monthlyExpense,
-            consumption = 1200.0,
             savings = 900.0,
             investments = 300.0,
             createdAt = LocalDateTime.now(),
@@ -252,7 +248,6 @@ class PersonalFinanceServiceImplTest {
             endDate = Date.from(Instant.parse("2026-03-31T00:00:00Z")),
             monthlyIncome = 5000.0,
             monthlyExpenses = firstMonthlyExpense,
-            consumption = 1200.0,
             savings = 900.0,
             investments = 300.0,
             createdAt = LocalDateTime.now(),
@@ -276,7 +271,6 @@ class PersonalFinanceServiceImplTest {
                 insurances = mutableListOf(),
                 subscriptions = mutableListOf(),
             ),
-            consumption = 1500.0,
             savings = 1200.0,
             investments = 600.0,
             createdAt = LocalDateTime.now(),
@@ -345,7 +339,6 @@ class PersonalFinanceServiceImplTest {
                 insurances = mutableListOf(),
                 subscriptions = mutableListOf(),
             ),
-            consumption = 1200.0,
             savings = 900.0,
             investments = 300.0,
             createdAt = LocalDateTime.now(),
@@ -373,9 +366,9 @@ class PersonalFinanceServiceImplTest {
     fun processCsvSavesFinalPartialBatch() {
         val savedBatches = mutableListOf<List<PersonalFinance>>()
         val csv = """
-            startDate,endDate,monthlyIncome,mortgagePayment,sharedHouseCost,foodBudget,carLoan,creditCardBill,electricityBill,studentLoans,tollFees,consumption,savings,investments
-            01.03.2026,31.03.2026,5000,1100,200,450,100,150,100,50,20,1200,900,300
-            01.04.2026,30.04.2026,6500,1400,250,500,,120,90,,30,1500,1200,600
+            startDate,endDate,monthlyIncome,mortgagePayment,sharedHouseCost,foodBudget,carLoan,creditCardBill,electricityBill,studentLoans,tollFees,savings,investments
+            01.03.2026,31.03.2026,5000,1100,200,450,100,150,100,50,20,900,300
+            01.04.2026,30.04.2026,6500,1400,250,500,,120,90,,30,1200,600
         """.trimIndent()
 
         doAnswer { invocation ->
@@ -395,8 +388,8 @@ class PersonalFinanceServiceImplTest {
     fun processCsvNormalizesNegativeLocalizedAmountsToPositiveValues() {
         val savedBatches = mutableListOf<List<PersonalFinance>>()
         val csv = """
-            startDate,endDate,monthlyIncome,mortgagePayment,sharedHouseCost,foodBudget,carLoan,creditCardBill,electricityBill,studentLoans,tollFees,consumption,savings,investments
-            01.03.2026,31.03.2026,"5000,50","−23 774,00",-200,-450,"−1 000,00",,"−90,50",,"−30","−1 500,75","−1 200,25","−600,10"
+            startDate,endDate,monthlyIncome,mortgagePayment,sharedHouseCost,foodBudget,carLoan,creditCardBill,electricityBill,studentLoans,tollFees,savings,investments
+            01.03.2026,31.03.2026,"50000,50","−23 774,00",-200,-450,"−1 000,00",,"−90,50",,"−30","−1 200,25","−600,10"
         """.trimIndent()
 
         doAnswer { invocation ->
@@ -408,7 +401,7 @@ class PersonalFinanceServiceImplTest {
 
         val savedFinance = savedBatches.single().single()
         assertAll(
-            { assertEquals(5000.50, savedFinance.monthlyIncome) },
+            { assertEquals(50000.50, savedFinance.monthlyIncome) },
             { assertEquals(23774.0, savedFinance.monthlyExpenses.mortgagePayment) },
             { assertEquals(200.0, savedFinance.monthlyExpenses.sharedHouseCost) },
             { assertEquals(450.0, savedFinance.monthlyExpenses.foodBudget) },
@@ -417,7 +410,6 @@ class PersonalFinanceServiceImplTest {
             { assertEquals(90.50, savedFinance.monthlyExpenses.electricityBill) },
             { assertEquals(null, savedFinance.monthlyExpenses.studentLoans) },
             { assertEquals(30.0, savedFinance.monthlyExpenses.tollFees) },
-            { assertEquals(1500.75, savedFinance.consumption) },
             { assertEquals(1200.25, savedFinance.savings) },
             { assertEquals(600.10, savedFinance.investments) },
         )

@@ -25,10 +25,13 @@ data class PersonalFinance (
     val monthlyIncome: Double,
     @OneToOne(fetch = FetchType.LAZY, cascade = [CascadeType.ALL])
     val monthlyExpenses: MonthlyExpenses,
-    val consumption: Double,
     val savings: Double?,
     val investments: Double?,
     @Column(updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val updatedAt: LocalDateTime = LocalDateTime.now(),
-)
+) {
+    fun getMonthlyInvestmentsAndSavings(): Double {
+        return (investments ?: 0.0) + (savings ?: 0.0)
+    }
+}

@@ -333,7 +333,6 @@ The finance read endpoints now return DTO responses instead of exposing JPA enti
       }
     ]
   },
-  "consumption": 2500.0,
   "savings": 5000.0,
   "investments": 4000.0
 }

@@ -30,4 +30,10 @@ data class MonthlyExpenses (
     val insurances:  MutableList<Insurance>,
     @OneToMany(fetch = FetchType.LAZY, cascade = [CascadeType.ALL])
     val subscriptions: MutableList<Subscription>,
-)
+) {
+    fun getSumOfMonthlyExpenses() : Double {
+        return this.mortgagePayment + this.sharedHouseCost + this.foodBudget + (this.carLoan ?: 0.0) + (this.creditCardBill ?: 0.0) +
+                (this.electricityBill ?: 0.0) + (this.studentLoans ?: 0.0) + (this.tollFees ?: 0.0) +
+                this.insurances.sumOf { it.insuranceCost } + this.subscriptions.sumOf { it.subscriptionCost }
+    }
+}
