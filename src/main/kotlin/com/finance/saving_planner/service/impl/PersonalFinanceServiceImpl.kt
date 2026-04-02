@@ -464,7 +464,7 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
 
     private fun validateCsvRecord(personalFinance: PersonalFinance): Boolean {
         val collectPersonalFinanceData = personalFinance.monthlyExpenses.getSumOfMonthlyExpenses() +
-                personalFinance.getMonthlyInvestmentsAndSavings();
+                personalFinance.getMonthlyInvestmentsAndSavings()
 
         return personalFinance.monthlyIncome > collectPersonalFinanceData
     }
