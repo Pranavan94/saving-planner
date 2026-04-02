@@ -35,6 +35,8 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
         private val logger = LoggerFactory.getLogger(PersonalFinanceServiceImpl::class.java)
         private val csvDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
         private const val csvBatchSize = 1000
+        private val insuranceColumnIndexes = 1..5
+        private val subscriptionColumnIndexes = 1..6
     }
 
     override fun createPersonalFinanceOverview(personalFinanceDto: PersonalFinanceOverviewDTO): PersonalFinance {
@@ -312,6 +314,8 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
         val startDate = parseCsvDate(record.getRequiredValue("startDate"))
         val endDate = parseCsvDate(record.getRequiredValue("endDate"))
         validateDateRange(startDate, endDate)
+        val insurances = insuranceColumnIndexes.mapNotNull { record.createInsuranceFromCsv(it) }.toMutableList()
+        val subscriptions = subscriptionColumnIndexes.mapNotNull { record.createSubscriptionFromCsv(it) }.toMutableList()
 
         return PersonalFinance(
             startDate = startDate,
@@ -326,11 +330,53 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
                 electricityBill = record.getNullableDouble("electricityBill", normalizeToPositive = true),
                 studentLoans = record.getNullableDouble("studentLoans", normalizeToPositive = true),
                 tollFees = record.getNullableDouble("tollFees", normalizeToPositive = true),
-                subscriptions = mutableListOf(),
-                insurances = mutableListOf(),
+                subscriptions = subscriptions,
+                insurances = insurances,
             ),
             savings = record.getDoubleOrDefault("savings", normalizeToPositive = true),
             investments = record.getDoubleOrDefault("investments", normalizeToPositive = true),
+        )
+    }
+
+    private fun CSVRecord.createInsuranceFromCsv(index: Int): Insurance? {
+        val typeColumn = "insurance${index}Type"
+        val costColumn = "insurance${index}Cost"
+        val companyColumn = "insurance${index}Company"
+        val type = getOptionalValue(typeColumn)
+        val cost = getOptionalValue(costColumn)
+        val company = getOptionalValue(companyColumn)
+
+        if (type == null && cost == null && company == null) {
+            return null
+        }
+
+        require(!type.isNullOrBlank()) { "Field '$typeColumn' is required in CSV record $recordNumber" }
+        require(!cost.isNullOrBlank()) { "Field '$costColumn' is required in CSV record $recordNumber" }
+        require(!company.isNullOrBlank()) { "Field '$companyColumn' is required in CSV record $recordNumber" }
+
+        return Insurance(
+            insuranceType = type,
+            insuranceCost = parseCsvNumericValue(cost, costColumn, normalizeToPositive = true),
+            insuranceCompany = company,
+        )
+    }
+
+    private fun CSVRecord.createSubscriptionFromCsv(index: Int): Subscription? {
+        val nameColumn = "subscription${index}Name"
+        val costColumn = "subscription${index}Cost"
+        val name = getOptionalValue(nameColumn)
+        val cost = getOptionalValue(costColumn)
+
+        if (name == null && cost == null) {
+            return null
+        }
+
+        require(!name.isNullOrBlank()) { "Field '$nameColumn' is required in CSV record $recordNumber" }
+        require(!cost.isNullOrBlank()) { "Field '$costColumn' is required in CSV record $recordNumber" }
+
+        return Subscription(
+            subscriptionName = name,
+            subscriptionCost = parseCsvNumericValue(cost, costColumn, normalizeToPositive = true),
         )
     }
 
@@ -338,6 +384,14 @@ class PersonalFinanceServiceImpl(private val personalFinanceRepository: Personal
         val value = this[columnName].trim()
         require(value.isNotBlank()) { "Field '$columnName' is required in CSV record $recordNumber" }
         return value
+    }
+
+    private fun CSVRecord.getOptionalValue(columnName: String): String? {
+        if (!isMapped(columnName)) {
+            return null
+        }
+
+        return this[columnName].trim().takeIf { it.isNotBlank() }
     }
 
     private fun CSVRecord.getRequiredDouble(columnName: String): Double {

@@ -414,4 +414,57 @@ class PersonalFinanceServiceImplTest {
             { assertEquals(600.10, savedFinance.investments) },
         )
     }
+
+    @Test
+    fun processCsvCreatesInsuranceAndSubscriptionCollectionsFromFlatColumns() {
+        val savedBatches = mutableListOf<List<PersonalFinance>>()
+        val csv = """
+            startDate,endDate,monthlyIncome,mortgagePayment,sharedHouseCost,foodBudget,carLoan,creditCardBill,electricityBill,studentLoans,tollFees,insurance1Type,insurance1Cost,insurance1Company,insurance2Type,insurance2Cost,insurance2Company,subscription1Name,subscription1Cost,subscription2Name,subscription2Cost,savings,investments
+            01.03.2026,31.03.2026,30000,5000,1000,2500,1000,2500,1000,2000,500,Health Insurance,1000,CVS Health,Car Insurance,750,If,Netflix,100,Spotify,50,5000,4000
+        """.trimIndent()
+
+        doAnswer { invocation ->
+            savedBatches += invocation.getArgument<Iterable<PersonalFinance>>(0).toList()
+            emptyList<PersonalFinance>()
+        }.whenever(personalFinanceRepository).saveAll(any<Iterable<PersonalFinance>>())
+
+        personalFinanceService.processCsv(ByteArrayInputStream(csv.toByteArray()))
+
+        val savedFinance = savedBatches.single().single()
+        assertAll(
+            { assertEquals(2, savedFinance.monthlyExpenses.insurances.size) },
+            { assertEquals("Health Insurance", savedFinance.monthlyExpenses.insurances[0].insuranceType) },
+            { assertEquals(1000.0, savedFinance.monthlyExpenses.insurances[0].insuranceCost) },
+            { assertEquals("CVS Health", savedFinance.monthlyExpenses.insurances[0].insuranceCompany) },
+            { assertEquals("Car Insurance", savedFinance.monthlyExpenses.insurances[1].insuranceType) },
+            { assertEquals(750.0, savedFinance.monthlyExpenses.insurances[1].insuranceCost) },
+            { assertEquals(2, savedFinance.monthlyExpenses.subscriptions.size) },
+            { assertEquals("Netflix", savedFinance.monthlyExpenses.subscriptions[0].subscriptionName) },
+            { assertEquals(100.0, savedFinance.monthlyExpenses.subscriptions[0].subscriptionCost) },
+            { assertEquals("Spotify", savedFinance.monthlyExpenses.subscriptions[1].subscriptionName) },
+            { assertEquals(50.0, savedFinance.monthlyExpenses.subscriptions[1].subscriptionCost) },
+        )
+    }
+
+    @Test
+    fun processCsvAllowsOlderHeaderWithoutInsuranceAndSubscriptionColumns() {
+        val savedBatches = mutableListOf<List<PersonalFinance>>()
+        val csv = """
+            startDate,endDate,monthlyIncome,mortgagePayment,sharedHouseCost,foodBudget,carLoan,creditCardBill,electricityBill,studentLoans,tollFees,savings,investments
+            01.03.2026,31.03.2026,5000,1100,200,450,100,150,100,50,20,900,300
+        """.trimIndent()
+
+        doAnswer { invocation ->
+            savedBatches += invocation.getArgument<Iterable<PersonalFinance>>(0).toList()
+            emptyList<PersonalFinance>()
+        }.whenever(personalFinanceRepository).saveAll(any<Iterable<PersonalFinance>>())
+
+        personalFinanceService.processCsv(ByteArrayInputStream(csv.toByteArray()))
+
+        val savedFinance = savedBatches.single().single()
+        assertAll(
+            { assertTrue(savedFinance.monthlyExpenses.insurances.isEmpty()) },
+            { assertTrue(savedFinance.monthlyExpenses.subscriptions.isEmpty()) },
+        )
+    }
 }
