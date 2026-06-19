@@ -11,6 +11,8 @@ data class InvestmentGoalDTO(
     val targetDate: Date?,
     val startingAmount: Double = 0.0,
     val expectedAnnualReturnRate: Double = 0.0,
+    val defaultAllocationPercentage: Double? = null,
+    val monthlyAllocationOverrides: List<GoalMonthlyAllocationOverrideDTO> = emptyList(),
     // Computed on read, ignored on write
     val currentAmount: Double? = null,
     val averageMonthlyContribution: Double? = null,

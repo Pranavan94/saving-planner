@@ -2,6 +2,7 @@ package com.finance.saving_planner.service.impl
 
 import com.finance.saving_planner.dto.SavingsGoalDTO
 import com.finance.saving_planner.model.SavingsGoal
+import com.finance.saving_planner.service.GoalAllocationSupport
 import com.finance.saving_planner.repository.SavingsGoalRepository
 import com.finance.saving_planner.service.GoalProgressCalculator
 import com.finance.saving_planner.service.SavingsGoalService
@@ -32,6 +33,8 @@ class SavingsGoalServiceImpl(
             startDate = savingsGoalDto.startDate,
             targetDate = savingsGoalDto.targetDate,
             startingAmount = savingsGoalDto.startingAmount,
+            defaultAllocationPercentage = savingsGoalDto.defaultAllocationPercentage,
+            monthlyAllocationOverrides = GoalAllocationSupport.toModel(savingsGoalDto.monthlyAllocationOverrides),
         )
         val saved = savingsGoalRepository.save(entity)
         logger.info("Created savings goal with id {}", saved.id)
@@ -61,6 +64,8 @@ class SavingsGoalServiceImpl(
             startDate = savingsGoalDto.startDate,
             targetDate = savingsGoalDto.targetDate,
             startingAmount = savingsGoalDto.startingAmount,
+            defaultAllocationPercentage = savingsGoalDto.defaultAllocationPercentage,
+            monthlyAllocationOverrides = GoalAllocationSupport.toModel(savingsGoalDto.monthlyAllocationOverrides),
             updatedAt = LocalDateTime.now(),
         )
         val saved = savingsGoalRepository.save(updated)
@@ -87,6 +92,12 @@ class SavingsGoalServiceImpl(
         require(dto.targetAmount > 0) { "Target amount must be greater than zero" }
         require(dto.startingAmount >= 0) { "Starting amount cannot be negative" }
         validateDateRange(dto.startDate, dto.targetDate)
+        GoalAllocationSupport.validatePlan(
+            defaultAllocationPercentage = dto.defaultAllocationPercentage,
+            monthlyAllocationOverrides = dto.monthlyAllocationOverrides,
+            startDate = dto.startDate,
+            targetDate = dto.targetDate,
+        )
     }
 
     private fun validateDateRange(startDate: Date?, targetDate: Date?) {
@@ -96,7 +107,12 @@ class SavingsGoalServiceImpl(
     }
 
     private fun toDto(goal: SavingsGoal): SavingsGoalDTO {
-        val progress = goalProgressCalculator.calculate(goal.startDate, goal.targetDate) { it.savings }
+        val progress = goalProgressCalculator.calculate(
+            startDate = goal.startDate,
+            targetDate = goal.targetDate,
+            defaultAllocationPercentage = goal.defaultAllocationPercentage,
+            monthlyAllocationOverrides = goal.monthlyAllocationOverrides,
+        ) { it.savings }
         return SavingsGoalDTO(
             id = goal.id,
             purpose = goal.purpose,
@@ -104,6 +120,8 @@ class SavingsGoalServiceImpl(
             startDate = goal.startDate,
             targetDate = goal.targetDate,
             startingAmount = goal.startingAmount,
+            defaultAllocationPercentage = goal.defaultAllocationPercentage,
+            monthlyAllocationOverrides = GoalAllocationSupport.toDto(goal.monthlyAllocationOverrides),
             currentAmount = goal.startingAmount + progress.contributed,
             averageMonthlyContribution = progress.averageMonthlyContribution,
         )
